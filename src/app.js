@@ -1,6 +1,7 @@
 import express from "express";
 import "./config/db.js";
-import userRouter from "./routes/usuario.routes.js"
+import userRouter from "./routes/usuario.routes.js";
+import categoryRouter from "./routes/categoria.routes.js";
 import { successResponse } from "./utils/response.handler.js";
 const app = express();
 
@@ -17,5 +18,8 @@ app.get('/', (req, res) => {
 
 // Ruta para usuarios
 app.use("/usuarios", userRouter);
+
+// Ruta para categorías
+app.use("/categorias", categoryRouter);
 
 export default app;
