@@ -22,15 +22,17 @@ Release objetivo: **v1.0.0**
 - [6. Configuración de base de datos](#6-configuración-de-base-de-datos)
 - [7. Ejecución del proyecto](#7-ejecución-del-proyecto)
 - [8. Endpoints de la API](#8-endpoints-de-la-api)
-  - [8.1 Usuarios](#81-usuarios)
-  - [8.2 Categorías](#82-categorías)
-  - [8.3 Productos](#83-productos)
-  - [8.4 Auditoría](#84-auditoría)
-- [9. Formato de respuestas](#9-formato-de-respuestas)
-- [10. Modelo de datos (resumen)](#10-modelo-de-datos-resumen)
-- [11. Scripts disponibles](#11-scripts-disponibles)
-- [12. Estado del release v1.0.0](#12-estado-del-release-v100)
-- [13. Changelog](#13-changelog)
+  - [8.1 Autenticación](#81-autenticación)
+  - [8.2 Usuarios](#82-usuarios)
+  - [8.3 Categorías](#83-categorías)
+  - [8.4 Productos](#84-productos)
+  - [8.5 Auditoría](#85-auditoría)
+- [9. Autenticación y autorización (JWT + roles)](#9-autenticación-y-autorización-jwt--roles)
+- [10. Formato de respuestas](#10-formato-de-respuestas)
+- [11. Modelo de datos (resumen)](#11-modelo-de-datos-resumen)
+- [12. Scripts disponibles](#12-scripts-disponibles)
+- [13. Estado del release v1.0.0](#13-estado-del-release-v100)
+- [14. Changelog](#14-changelog)
 
 ---
 
@@ -179,7 +181,23 @@ Ruta base:
 
 ## 8. Endpoints de la API
 
-## 8.1 Usuarios
+## 8.1 Autenticación
+
+Base: `/auth`
+
+- `POST /auth/login`
+
+### Campos relevantes (login)
+- `username` (requerido)
+- `password` (requerido)
+
+### Respuesta exitosa (resumen)
+- `token` JWT
+- `user` autenticado (`id`, `nombre`, `username`, `rol`)
+
+---
+
+## 8.2 Usuarios
 
 Base: `/usuarios`
 
@@ -198,7 +216,7 @@ Base: `/usuarios`
 
 ---
 
-## 8.2 Categorías
+## 8.3 Categorías
 
 Base: `/categorias`
 
@@ -216,7 +234,7 @@ Base: `/categorias`
 
 ---
 
-## 8.3 Productos
+## 8.4 Productos
 
 Base: `/productos`
 
@@ -236,7 +254,7 @@ Base: `/productos`
 
 ---
 
-## 8.4 Auditoría
+## 8.5 Auditoría
 
 Base: `/auditoria`
 
@@ -257,7 +275,40 @@ Base: `/auditoria`
 
 ---
 
-## 9. Formato de respuestas
+## 9. Autenticación y autorización (JWT + roles)
+
+### 9.1 JWT
+- Al autenticar correctamente en `POST /auth/login` se emite un token JWT.
+- El token debe enviarse en cada petición protegida:
+
+```http
+Authorization: Bearer <token>
+```
+
+### 9.2 Middleware de seguridad
+- `authMiddleware`:
+  - valida firma y formato del token
+  - rechaza peticiones sin token o token inválido
+  - inyecta datos de usuario autenticado en la request
+- `checkRole(...roles)`:
+  - autoriza acceso según rol (`admin`, `user`)
+
+### 9.3 Roles y permisos por módulo
+
+| Módulo / Ruta base | GET (listar/consultar) | POST | PUT/PATCH | DELETE |
+|---|---|---|---|---|
+| `/usuarios` | `admin`, `user` | `admin` | `admin` | `admin` |
+| `/categorias` | `admin`, `user` | `admin` | `admin` | `admin` |
+| `/productos` | `admin`, `user` | `admin` | `admin` | `admin` |
+| `/auditoria` | `admin`, `user` | `admin` | `admin` | `admin` |
+
+### 9.4 Endpoint público actual
+- `GET /` (mensaje de bienvenida)
+- `POST /auth/login` (autenticación inicial)
+
+---
+
+## 10. Formato de respuestas
 
 La API estandariza respuestas con `src/utils/response.handler.js`.
 
@@ -284,12 +335,14 @@ La API estandariza respuestas con `src/utils/response.handler.js`.
 
 ---
 
-## 10. Modelo de datos (resumen)
+## 11. Modelo de datos (resumen)
 
 ### `usuarios`
 - `id` (PK)
 - `documento` (unique)
 - `nombre`
+- `username` (unique)
+- `password_hash`
 - `rol` (`admin` / `user`)
 - `creado_en`, `actualizado_en`
 
@@ -318,7 +371,7 @@ La API estandariza respuestas con `src/utils/response.handler.js`.
 
 ---
 
-## 11. Scripts disponibles
+## 12. Scripts disponibles
 
 Según `package.json`:
 
@@ -338,7 +391,7 @@ npm run dev
 
 ---
 
-## 12. Estado del release v1.0.0
+## 13. Estado del release v1.0.0
 
 Para esta versión se encuentra implementado y funcional:
 
@@ -352,7 +405,7 @@ Para esta versión se encuentra implementado y funcional:
 
 ---
 
-## 13. Changelog
+## 14. Changelog
 
 Revisar historial funcional detallado en:
 
@@ -366,7 +419,7 @@ Incluye evolución de:
 
 ---
 
-## 14. Consumo desde Frontend (fetch/curl)
+## 15. Consumo desde Frontend (fetch/curl)
 
 ### 14.1 CORS
 El backend tiene CORS habilitado para permitir consumo desde frontend (por ejemplo, `http://localhost` o servidores estáticos locales).
