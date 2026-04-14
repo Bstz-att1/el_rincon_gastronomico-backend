@@ -3,6 +3,7 @@ import "./config/db.js";
 import userRouter from "./routes/usuario.routes.js";
 import categoryRouter from "./routes/categoria.routes.js";
 import productRouter from "./routes/producto.routes.js";
+import auditRouter from "./routes/auditoria.routes.js";
 import { successResponse } from "./utils/response.handler.js";
 const app = express();
 
@@ -25,5 +26,8 @@ app.use("/categorias", categoryRouter);
 
 // Ruta para productos
 app.use("/productos", productRouter);
+
+// Ruta para auditoría
+app.use("/auditoria", auditRouter);
 
 export default app;
