@@ -7,6 +7,7 @@ import {
     updateCategoryPartial,
     deleteCategory
 } from "../controllers/categoria.controller.js";
+import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const categoryRouter = Router();
 
@@ -15,21 +16,21 @@ const categoryRouter = Router();
 // ============================================
 
 // Obtener todas las categorías
-categoryRouter.get("/", getAllCategories);
+categoryRouter.get("/", authMiddleware, checkRole("admin", "user"), getAllCategories);
 
 // Obtener una categoría específica por su ID
-categoryRouter.get("/:id", getCategoryById);
+categoryRouter.get("/:id", authMiddleware, checkRole("admin", "user"), getCategoryById);
 
 // Registrar una nueva categoría
-categoryRouter.post("/", createCategory);
+categoryRouter.post("/", authMiddleware, checkRole("admin"), createCategory);
 
 // Actualizar datos de la categoría completamente ( PUT )
-categoryRouter.put("/:id", updateCategoryComplete);
+categoryRouter.put("/:id", authMiddleware, checkRole("admin"), updateCategoryComplete);
 
 // Actualizar datos de la categoría parcialmente ( PATCH )
-categoryRouter.patch("/:id", updateCategoryPartial);
+categoryRouter.patch("/:id", authMiddleware, checkRole("admin"), updateCategoryPartial);
 
 // Eliminar una categoría del sistema
-categoryRouter.delete("/:id", deleteCategory);
+categoryRouter.delete("/:id", authMiddleware, checkRole("admin"), deleteCategory);
 
 export default categoryRouter;

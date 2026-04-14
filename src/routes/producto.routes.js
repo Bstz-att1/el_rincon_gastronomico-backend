@@ -7,6 +7,7 @@ import {
     updateProductPartial,
     deleteProduct
 } from "../controllers/producto.controller.js";
+import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const productRouter = Router();
 
@@ -15,21 +16,21 @@ const productRouter = Router();
 // ============================================
 
 // Obtener todos los productos
-productRouter.get("/", getAllProducts);
+productRouter.get("/", authMiddleware, checkRole("admin", "user"), getAllProducts);
 
 // Obtener un producto específico por su ID
-productRouter.get("/:id", getProductById);
+productRouter.get("/:id", authMiddleware, checkRole("admin", "user"), getProductById);
 
 // Registrar un nuevo producto
-productRouter.post("/", createProduct);
+productRouter.post("/", authMiddleware, checkRole("admin"), createProduct);
 
 // Actualizar datos del producto completamente ( PUT )
-productRouter.put("/:id", updateProductComplete);
+productRouter.put("/:id", authMiddleware, checkRole("admin"), updateProductComplete);
 
 // Actualizar datos del producto parcialmente ( PATCH )
-productRouter.patch("/:id", updateProductPartial);
+productRouter.patch("/:id", authMiddleware, checkRole("admin"), updateProductPartial);
 
 // Eliminar un producto del sistema
-productRouter.delete("/:id", deleteProduct);
+productRouter.delete("/:id", authMiddleware, checkRole("admin"), deleteProduct);
 
 export default productRouter;

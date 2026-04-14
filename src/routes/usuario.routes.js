@@ -7,6 +7,7 @@ import {
     updateUserPartial,
     deleteUser
 } from "../controllers/usuario.controller.js";
+import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const userRouter = Router();
 
@@ -15,21 +16,21 @@ const userRouter = Router();
 // ============================================
 
 // Obtener todos los usuarios
-userRouter.get("/", getAllUsers);
+userRouter.get("/", authMiddleware, checkRole("admin", "user"), getAllUsers);
 
 // Obtener un usuario específico por su ID
-userRouter.get("/:id", getUserById);
+userRouter.get("/:id", authMiddleware, checkRole("admin", "user"), getUserById);
 
 // Registrar un nuevo usuario
-userRouter.post("/", createUser);
+userRouter.post("/", authMiddleware, checkRole("admin"), createUser);
 
 // Actualizar datos del usuario completamente ( PUT )
-userRouter.put("/:id", updateUserComplete);
+userRouter.put("/:id", authMiddleware, checkRole("admin"), updateUserComplete);
 
 // Actualizar datos del usuario parcialmente ( PATCH )
-userRouter.patch("/:id", updateUserPartial);
+userRouter.patch("/:id", authMiddleware, checkRole("admin"), updateUserPartial);
 
 // Eliminar un usuario del sistema
-userRouter.delete("/:id", deleteUser);
+userRouter.delete("/:id", authMiddleware, checkRole("admin"), deleteUser);
 
 export default userRouter;
