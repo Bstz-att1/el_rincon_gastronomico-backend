@@ -245,3 +245,121 @@ Base: `/productos`
    - body parcial con cualquiera de:
      - `nombre`, `descripcion`, `categoria_id`, `cantidad`
 6. `DELETE /productos/:id`
+
+---
+
+## Actualización reciente: Módulo de Auditoría
+
+Se implementó el módulo de **auditoría** manteniendo la misma arquitectura de capas y estilo ya aplicado en usuarios/categorías/productos:
+- `models`
+- `controllers`
+- `routes`
+- integración en `app.js`
+
+Objetivo: respetar la lógica existente del proyecto y cumplir los requerimientos de la tabla `audit_logs` definida en la base de datos.
+
+### Archivos creados
+
+#### 1) `src/models/auditoria.model.js`
+Se creó `AuditModel` con CRUD para la tabla `audit_logs`:
+
+- `findAll()`
+  - Consulta: `SELECT * FROM audit_logs`
+- `findById(id)`
+  - Consulta por id: `SELECT * FROM audit_logs WHERE id = ?`
+- `create({ usuario_id, accion, tabla_afectada, registro_id, detalles })`
+  - Inserta registro de auditoría nuevo
+  - Usa `detalles || null`
+  - Retorna el registro recién creado
+- `updateComplete(id, { usuario_id, accion, tabla_afectada, registro_id, detalles })`
+  - PUT completo
+  - Exige: `usuario_id`, `accion`, `tabla_afectada`, `registro_id`
+  - Si no afecta filas retorna `null`
+  - Retorna registro actualizado
+- `updatePartial(id, updatedFields)`
+  - PATCH parcial
+  - Usa `COALESCE` en `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `detalles`
+  - Si no afecta filas retorna `null`
+  - Retorna registro actualizado
+- `delete(id)`
+  - Elimina por id y retorna booleano (`affectedRows > 0`)
+
+#### 2) `src/controllers/auditoria.controller.js`
+Se creó el controlador con respuestas estandarizadas (`successResponse`, `errorResponse`):
+
+- `getAllAuditLogs`
+  - Lista completa de registros de auditoría
+- `getAuditLogById`
+  - Busca por id, responde 404 si no existe
+- `createAuditLog`
+  - Valida obligatorios: `usuario_id`, `accion`, `tabla_afectada`, `registro_id`
+  - Crea registro y retorna resultado
+- `updateAuditLogComplete`
+  - Valida obligatorios para PUT: `usuario_id`, `accion`, `tabla_afectada`, `registro_id`
+  - Responde 404 si el id no existe
+- `updateAuditLogPartial`
+  - Exige al menos un campo entre:
+    - `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `detalles`
+  - Responde 404 si el id no existe
+- `deleteAuditLog`
+  - Verifica existencia previa con `findById`
+  - Elimina y responde éxito o 404
+
+#### 3) `src/routes/auditoria.routes.js`
+Se creó `auditRouter` con CRUD completo:
+
+- `GET /` → `getAllAuditLogs`
+- `GET /:id` → `getAuditLogById`
+- `POST /` → `createAuditLog`
+- `PUT /:id` → `updateAuditLogComplete`
+- `PATCH /:id` → `updateAuditLogPartial`
+- `DELETE /:id` → `deleteAuditLog`
+
+### Archivos modificados
+
+#### 4) `src/app.js`
+Se integró el módulo de auditoría:
+
+- Import agregado:
+  - `import auditRouter from "./routes/auditoria.routes.js";`
+- Registro de ruta:
+  - `app.use("/auditoria", auditRouter);`
+
+### Consistencia con base de datos (`audit_logs`)
+Compatibilidad con `sql/database.sql`:
+- `usuario_id` (obligatorio, FK a `usuarios.id`)
+- `accion` (obligatorio)
+- `tabla_afectada` (obligatorio)
+- `registro_id` (obligatorio)
+- `detalles` (opcional)
+- `fecha` (timestamp con default `CURRENT_TIMESTAMP`)
+
+No fue necesario modificar esquema SQL para soportar el módulo nuevo.
+
+### Endpoints nuevos disponibles
+
+Base: `/auditoria`
+
+1. `GET /auditoria`
+2. `GET /auditoria/:id`
+3. `POST /auditoria`
+   - body mínimo: `{ "usuario_id": 1, "accion": "INSERT", "tabla_afectada": "productos", "registro_id": 10 }`
+4. `PUT /auditoria/:id`
+   - body requerido: `{ "usuario_id": 1, "accion": "UPDATE", "tabla_afectada": "productos", "registro_id": 10, "detalles": "Cambio de cantidad" }`
+5. `PATCH /auditoria/:id`
+   - body parcial con cualquiera de:
+     - `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `detalles`
+6. `DELETE /auditoria/:id`
+
+### Validaciones y comportamiento importante
+
+- Creación:
+  - Requiere `usuario_id`, `accion`, `tabla_afectada`, `registro_id`
+- PUT:
+  - Requiere `usuario_id`, `accion`, `tabla_afectada`, `registro_id`
+- PATCH:
+  - Requiere al menos un campo para actualizar
+- Operaciones por id:
+  - Si el recurso no existe responde 404
+- Respuestas:
+  - Estandarizadas con utilidades del proyecto (`response.handler.js`)
