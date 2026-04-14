@@ -6,11 +6,11 @@
 -- USUARIOS
 -- --------------------------------------------
 
-INSERT INTO usuarios (documento, nombre, rol) VALUES
-('0012345678', 'Dario Admin', 'admin'),
-('0098765432', 'Maria Usuario', 'user'),
-('0055555555', 'Carlos Cocinero', 'user'),
-('0033333333', 'Ana Recepcionista', 'user');
+INSERT INTO usuarios (documento, nombre, username, password_hash, rol) VALUES
+('0012345678', 'Dario Admin', 'admin', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'admin'),
+('0098765432', 'Maria Usuario', 'maria', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user'),
+('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user'),
+('0033333333', 'Ana Recepcionista', 'ana', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user');
 
 -- --------------------------------------------
 -- CATEGORIAS
