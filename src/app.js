@@ -5,6 +5,7 @@ import userRouter from "./routes/usuario.routes.js";
 import categoryRouter from "./routes/categoria.routes.js";
 import productRouter from "./routes/producto.routes.js";
 import auditRouter from "./routes/auditoria.routes.js";
+import authRouter from "./routes/auth.routes.js";
 import { successResponse } from "./utils/response.handler.js";
 const app = express();
 
@@ -19,6 +20,9 @@ app.get('/', (req, res) => {
 //  ============================================
 //              DEFINICION DE RUTAS
 //  ============================================
+
+// Ruta de autenticación
+app.use("/auth", authRouter);
 
 // Ruta para usuarios
 app.use("/usuarios", userRouter);
