@@ -7,10 +7,10 @@
 -- --------------------------------------------
 
 INSERT INTO usuarios (documento, nombre, username, password_hash, rol) VALUES
-('0012345678', 'Dario Admin', 'admin', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'admin'),
-('0098765432', 'Maria Usuario', 'maria', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user'),
-('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user'),
-('0033333333', 'Ana Recepcionista', 'ana', '$2a$10$k8R1f5H8N2v8YkTQ6Qn7k.4yMjl4QmQm9A7e8cM1TQfB0mS8nR1y2', 'user');
+('0012345678', 'Dario Admin', 'admin', '$2a$10$nPz.7zemuEFA55BNDS7aju8Atrk9K9WYaKOOwcsG7gHjnpoz0ZBd.', 'admin'),
+('0098765432', 'Maria Usuario', 'maria', '$2a$10$JdqkIGmT5wIoIo.X5afS4OgMiggCMW2.gjwYXZMKWsKQ5f151b2am', 'user'),
+('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$PcPK3b3QRKKSY6.fkFV/.eyktSzGRhYXOmmZwyQdu25TdcPRGZVsu', 'user'),
+('0033333333', 'Ana Recepcionista', 'ana', '$2a$10$Gd/T3MvNwffObcngZFuCSeYSZBZB2aVNs4.OWrIvOKzeq2zYsaS2y', 'user');
 
 -- --------------------------------------------
 -- CATEGORIAS
