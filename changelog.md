@@ -467,3 +467,86 @@ Funciones incluidas:
 - Endpoints principales consumidos con `fetch`.
 - Formularios enviando datos en JSON.
 - Estructura de capas y estilo arquitectónico preservados.
+
+---
+
+## 🔐 Actualización reciente: Autenticación JWT + Autorización por Rol (admin/user)
+
+Se implementó seguridad de acceso basada en usuarios existentes de base de datos, contraseñas hasheadas y control de permisos por rol.
+
+### Cambios en backend
+
+#### Dependencias (`package.json`)
+Se agregaron librerías de seguridad:
+- `bcryptjs` (hash/validación de contraseñas)
+- `jsonwebtoken` (emisión/verificación de JWT)
+
+#### Nuevos archivos
+- `src/controllers/auth.controller.js`
+  - Implementa `POST /auth/login`.
+  - Valida credenciales contra tabla `usuarios`.
+  - Compara contraseña en texto con `password_hash` usando bcrypt.
+  - Genera JWT con datos mínimos del usuario (`id`, `nombre`, `username`, `rol`).
+- `src/routes/auth.routes.js`
+  - Expone ruta de autenticación:
+    - `POST /auth/login`
+- `src/middlewares/auth.middleware.js`
+  - `authMiddleware`: valida `Authorization: Bearer <token>`.
+  - `checkRole(...roles)`: permite/deniega acceso por rol.
+
+#### Archivos modificados
+- `src/app.js`
+  - Se registró módulo de auth:
+    - `app.use("/auth", authRouter);`
+- `src/models/usuario.model.js`
+  - Se añadieron operaciones para autenticación:
+    - `findByUsername(username)`
+    - búsqueda con contraseña para login.
+  - Se reforzó sanitización para no exponer `password_hash` en listados públicos.
+  - `create` actualizado para soportar:
+    - `username`
+    - `password_hash`
+- `src/controllers/usuario.controller.js`
+  - En creación de usuario:
+    - recibe `username` y `password`
+    - genera hash bcrypt antes de persistir
+    - valida duplicidad por `documento` y `username`
+- `src/routes/usuario.routes.js`
+- `src/routes/categoria.routes.js`
+- `src/routes/producto.routes.js`
+- `src/routes/auditoria.routes.js`
+  - Se protegieron rutas con:
+    - `authMiddleware`
+    - `checkRole("admin", "user")` para lecturas.
+    - `checkRole("admin")` para creación/edición/eliminación (acciones administrativas).
+
+#### SQL actualizado
+- `sql/database.sql`
+  - Tabla `usuarios` ampliada con:
+    - `username` (UNIQUE, obligatorio)
+    - `password_hash` (obligatorio)
+  - Roles mantenidos según requerimiento: `admin` y `user`.
+- `sql/data.sql`
+  - Datos semilla actualizados al nuevo esquema:
+    - incluye `username`
+    - incluye `password_hash`
+
+### Endpoints impactados
+
+#### Autenticación
+- `POST /auth/login`
+  - body: `{ "username": "...", "password": "..." }`
+  - respuesta exitosa: token JWT + usuario autenticado
+
+#### Endpoints protegidos (requieren Bearer token)
+- `/usuarios`
+- `/categorias`
+- `/productos`
+- `/auditoria`
+
+### Reglas de rol aplicadas
+- `admin`:
+  - acceso completo CRUD en todos los módulos.
+- `user`:
+  - acceso de consulta (GET) en módulos protegidos.
+  - sin permisos administrativos de creación/edición/eliminación en rutas restringidas.
