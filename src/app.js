@@ -2,6 +2,7 @@ import express from "express";
 import "./config/db.js";
 import userRouter from "./routes/usuario.routes.js";
 import categoryRouter from "./routes/categoria.routes.js";
+import productRouter from "./routes/producto.routes.js";
 import { successResponse } from "./utils/response.handler.js";
 const app = express();
 
@@ -21,5 +22,8 @@ app.use("/usuarios", userRouter);
 
 // Ruta para categorías
 app.use("/categorias", categoryRouter);
+
+// Ruta para productos
+app.use("/productos", productRouter);
 
 export default app;
