@@ -145,3 +145,103 @@ Base: `/categorias`
   - Estandarizadas con utilidades del proyecto (`response.handler.js`)
 
 ---
+
+## Actualización reciente: Módulo de Productos
+
+Se implementó el módulo de **productos** manteniendo la misma arquitectura de capas y estilo ya aplicado en usuarios/categorías:
+- `models`
+- `controllers`
+- `routes`
+- integración en `app.js`
+
+Objetivo: respetar la lógica existente del proyecto y cumplir los requerimientos de la tabla `productos` definida en la base de datos.
+
+### Archivos creados
+
+#### 1) `src/models/producto.model.js`
+Se creó `ProductModel` con CRUD para la tabla `productos`:
+
+- `findAll()`
+  - Consulta: `SELECT * FROM productos`
+- `findById(id)`
+  - Consulta por id: `SELECT * FROM productos WHERE id = ?`
+- `create({ nombre, descripcion, categoria_id, cantidad })`
+  - Inserta producto nuevo
+  - Usa `descripcion || null`
+  - Usa `cantidad ?? 0` (alineado con default de DB)
+  - Retorna el registro recién creado
+- `updateComplete(id, { nombre, descripcion, categoria_id, cantidad })`
+  - PUT completo
+  - Exige: `nombre`, `categoria_id`, `cantidad`
+  - Si no afecta filas retorna `null`
+  - Retorna registro actualizado
+- `updatePartial(id, updatedFields)`
+  - PATCH parcial
+  - Usa `COALESCE` en `nombre`, `descripcion`, `categoria_id`, `cantidad`
+  - Si no afecta filas retorna `null`
+  - Retorna registro actualizado
+- `delete(id)`
+  - Elimina por id y retorna booleano (`affectedRows > 0`)
+
+#### 2) `src/controllers/producto.controller.js`
+Se creó el controlador con respuestas estandarizadas (`successResponse`, `errorResponse`):
+
+- `getAllProducts`
+  - Lista completa de productos
+- `getProductById`
+  - Busca por id, responde 404 si no existe
+- `createProduct`
+  - Valida obligatorios: `nombre`, `categoria_id`
+  - Crea producto y retorna resultado
+- `updateProductComplete`
+  - Valida obligatorios para PUT: `nombre`, `categoria_id`, `cantidad`
+  - Responde 404 si el id no existe
+- `updateProductPartial`
+  - Exige al menos un campo entre:
+    - `nombre`, `descripcion`, `categoria_id`, `cantidad`
+  - Responde 404 si el id no existe
+- `deleteProduct`
+  - Verifica existencia previa con `findById`
+  - Elimina y responde éxito o 404
+
+#### 3) `src/routes/producto.routes.js`
+Se creó `productRouter` con CRUD completo:
+
+- `GET /` → `getAllProducts`
+- `GET /:id` → `getProductById`
+- `POST /` → `createProduct`
+- `PUT /:id` → `updateProductComplete`
+- `PATCH /:id` → `updateProductPartial`
+- `DELETE /:id` → `deleteProduct`
+
+### Archivos modificados
+
+#### 4) `src/app.js`
+Se integró el módulo de productos:
+
+- Import agregado:
+  - `import productRouter from "./routes/producto.routes.js";`
+- Registro de ruta:
+  - `app.use("/productos", productRouter);`
+
+### Consistencia con base de datos (`productos`)
+Compatibilidad con `sql/database.sql`:
+- `nombre` (obligatorio)
+- `descripcion` (opcional)
+- `categoria_id` (obligatorio, FK a `categorias.id`)
+- `cantidad` (default 0)
+
+### Endpoints nuevos disponibles
+
+Base: `/productos`
+
+1. `GET /productos`
+2. `GET /productos/:id`
+3. `POST /productos`
+   - body mínimo: `{ "nombre": "...", "categoria_id": 1 }`
+4. `PUT /productos/:id`
+   - body requerido: `{ "nombre": "...", "descripcion": "...", "categoria_id": 1, "cantidad": 10 }`
+5. `PATCH /productos/:id`
+   - body parcial con cualquiera de:
+     - `nombre`, `descripcion`, `categoria_id`, `cantidad`
+6. `DELETE /productos/:id`
