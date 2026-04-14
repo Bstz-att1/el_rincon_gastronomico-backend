@@ -363,3 +363,133 @@ Incluye evolución de:
 - módulo de productos
 - módulo de auditoría
 - integración progresiva en la app principal
+
+---
+
+## 14. Consumo desde Frontend (fetch/curl)
+
+### 14.1 CORS
+El backend tiene CORS habilitado para permitir consumo desde frontend (por ejemplo, `http://localhost` o servidores estáticos locales).
+
+### 14.2 URL base sugerida
+```text
+http://localhost:3000
+```
+
+### 14.3 Ejemplos con fetch (Frontend Vanilla JS)
+
+#### Usuarios
+```js
+// GET /usuarios
+const usersRes = await fetch("http://localhost:3000/usuarios");
+const usersJson = await usersRes.json();
+
+// POST /usuarios
+const createUserRes = await fetch("http://localhost:3000/usuarios", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    documento: "1020304050",
+    nombre: "Laura Méndez",
+    rol: "admin"
+  })
+});
+const createUserJson = await createUserRes.json();
+```
+
+#### Categorías
+```js
+// GET /categorias
+const categoriesRes = await fetch("http://localhost:3000/categorias");
+const categoriesJson = await categoriesRes.json();
+
+// POST /categorias
+const createCategoryRes = await fetch("http://localhost:3000/categorias", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    nombre: "cocina",
+    descripcion: "Insumos de cocina"
+  })
+});
+const createCategoryJson = await createCategoryRes.json();
+```
+
+#### Productos
+```js
+// GET /productos
+const productsRes = await fetch("http://localhost:3000/productos");
+const productsJson = await productsRes.json();
+
+// POST /productos
+const createProductRes = await fetch("http://localhost:3000/productos", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    nombre: "Tomate",
+    descripcion: "Proveedor local",
+    categoria_id: 1,
+    cantidad: 20
+  })
+});
+const createProductJson = await createProductRes.json();
+```
+
+#### Auditoría
+```js
+// GET /auditoria
+const auditRes = await fetch("http://localhost:3000/auditoria");
+const auditJson = await auditRes.json();
+
+// POST /auditoria
+const createAuditRes = await fetch("http://localhost:3000/auditoria", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    usuario_id: 1,
+    accion: "INSERT",
+    tabla_afectada: "productos",
+    registro_id: 10,
+    detalles: "Creación inicial de producto"
+  })
+});
+const createAuditJson = await createAuditRes.json();
+```
+
+### 14.4 Ejemplos con cURL
+
+#### Usuarios
+```bash
+curl -X GET http://localhost:3000/usuarios
+
+curl -X POST http://localhost:3000/usuarios ^
+  -H "Content-Type: application/json" ^
+  -d "{\"documento\":\"1020304050\",\"nombre\":\"Laura Méndez\",\"rol\":\"admin\"}"
+```
+
+#### Categorías
+```bash
+curl -X GET http://localhost:3000/categorias
+
+curl -X POST http://localhost:3000/categorias ^
+  -H "Content-Type: application/json" ^
+  -d "{\"nombre\":\"cocina\",\"descripcion\":\"Insumos de cocina\"}"
+```
+
+#### Productos
+```bash
+curl -X GET http://localhost:3000/productos
+
+curl -X POST http://localhost:3000/productos ^
+  -H "Content-Type: application/json" ^
+  -d "{\"nombre\":\"Tomate\",\"descripcion\":\"Proveedor local\",\"categoria_id\":1,\"cantidad\":20}"
+```
+
+#### Auditoría
+```bash
+curl -X GET http://localhost:3000/auditoria
+
+curl -X POST http://localhost:3000/auditoria ^
+  -H "Content-Type: application/json" ^
+  -d "{\"usuario_id\":1,\"accion\":\"INSERT\",\"tabla_afectada\":\"productos\",\"registro_id\":10,\"detalles\":\"Creación inicial de producto\"}"
+```
