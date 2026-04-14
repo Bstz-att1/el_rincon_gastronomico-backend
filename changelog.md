@@ -363,3 +363,107 @@ Base: `/auditoria`
   - Si el recurso no existe responde 404
 - Respuestas:
   - Estandarizadas con utilidades del proyecto (`response.handler.js`)
+
+---
+
+## Actualización reciente: Integración Frontend ↔ Backend (Vanilla JS + API REST)
+
+Se implementó la integración entre frontend y backend manteniendo la arquitectura establecida en el plan de mejoramiento:
+
+- Backend: habilitación de CORS y mantenimiento del estándar de respuestas JSON.
+- Frontend: centralización de llamadas HTTP en módulo API y consumo real desde vistas modulares.
+- Documentación: actualización de README con ejemplos de consumo para frontend y curl.
+
+### Backend
+
+#### `src/app.js`
+- Se agregó middleware CORS:
+  - `import cors from "cors";`
+  - `app.use(cors());`
+- Se conserva sin cambios la estructura de rutas por módulo:
+  - `/usuarios`
+  - `/categorias`
+  - `/productos`
+  - `/auditoria`
+- Se mantiene respuesta estandarizada en `/` con `successResponse`.
+
+### Frontend
+
+#### 1) Nuevo módulo `assets/js/api.js`
+Se creó un módulo centralizado para llamadas REST con `fetch`, `Content-Type: application/json` y manejo uniforme de errores.
+
+Funciones incluidas:
+
+- Usuarios:
+  - `getAllUsers()`
+  - `getUserById(id)`
+  - `createUser(userData)`
+- Categorías:
+  - `getAllCategories()`
+  - `getCategoryById(id)`
+  - `createCategory(categoryData)`
+- Productos:
+  - `getAllProducts()`
+  - `getProductById(id)`
+  - `createProduct(productData)`
+- Auditoría:
+  - `getAllAuditLogs()`
+  - `getAuditLogById(id)`
+  - `createAuditLog(auditData)`
+
+#### 2) Archivo barril `assets/js/index.js`
+- Se centralizaron exportaciones del módulo API junto con los módulos de vista.
+- Se mantiene modularización por archivo y consumo limpio desde otros módulos.
+
+#### 3) Integración en vistas
+
+##### `assets/js/usuarios.js`
+- Se reemplazó persistencia local como fuente principal por consumo backend:
+  - listado dinámico con `getAllUsers()`
+  - creación con `createUser()`
+- Se envían formularios en JSON (`documento`, `nombre`, `rol`).
+- Se mantiene fallback visual de usuarios para continuidad de interfaz si hay error de red.
+- Se conserva login local de demostración (`admin/admin123`) para no romper flujo existente.
+
+##### `assets/js/inventario.js`
+- Se integró consumo de:
+  - categorías (`getAllCategories`, `createCategory`)
+  - productos (`getAllProducts`, `createProduct`)
+  - usuarios (`getAllUsers`) para contexto de auditoría.
+- Se inyectan dinámicamente:
+  - listado de categorías
+  - selects de categorías para formulario y filtro
+  - tabla de inventario con datos backend
+- Se envía formulario de producto en JSON:
+  - `nombre`
+  - `descripcion` (usando campo proveedor actual)
+  - `categoria_id`
+  - `cantidad`
+- Se agregó registro de auditoría posterior a creación de producto (`createAuditLog`) sin bloquear UX si falla.
+
+##### `assets/js/auditoria.js`
+- Se migró de lectura local a consumo backend:
+  - consulta de auditoría con `getAllAuditLogs`
+  - consulta de usuarios con `getAllUsers`
+  - creación de registros con `createAuditLog`
+- Se renderiza resumen por usuario usando registros de auditoría reales.
+- Se renderiza tabla por usuario con:
+  - acción
+  - tabla afectada
+  - detalles
+- El formulario envía payload JSON al endpoint `/auditoria`.
+
+### Documentación
+
+#### `README.md`
+- Se agregó sección **Consumo desde Frontend (fetch/curl)**:
+  - explicación de CORS
+  - URL base sugerida
+  - ejemplos `fetch` (GET/POST) para usuarios, categorías, productos, auditoría
+  - ejemplos `curl` para Windows CMD usando `^`
+
+### Resultado de la integración
+- Frontend desacoplado por módulos y conectado al backend vía API central.
+- Endpoints principales consumidos con `fetch`.
+- Formularios enviando datos en JSON.
+- Estructura de capas y estilo arquitectónico preservados.
