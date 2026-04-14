@@ -4,13 +4,21 @@ export const UserModel = {
     // 1. Obtener todos los usuarios
     findAll: async () => {
         const [rows] = await pool.query(
-            "SELECT * FROM usuarios"
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios"
         );
         return rows;
     },
 
     // 2. Obtener un usuario por ID
     findById: async (id) => {
+        const [rows] = await pool.query(
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios WHERE id = ?",
+            [id]
+        );
+        return rows[0];
+    },
+
+    findByIdWithPassword: async (id) => {
         const [rows] = await pool.query(
             "SELECT * FROM usuarios WHERE id = ?",
             [id]
@@ -21,25 +29,31 @@ export const UserModel = {
     // 3. Buscar por documento (Para validaciones de duplicados)
     findByDocumento: async (documento) => {
         const [rows] = await pool.query(
-            "SELECT * FROM usuarios WHERE documento = ?",
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios WHERE documento = ?",
             [documento]
+        );
+        return rows[0];
+    },
+
+    findByUsername: async (username) => {
+        const [rows] = await pool.query(
+            "SELECT * FROM usuarios WHERE username = ?",
+            [username]
         );
         return rows[0];
     },
 
     // 4. Crear un nuevo usuario
     create: async (userData) => {
-        const { documento, nombre, rol } = userData;
+        const { documento, nombre, username, password_hash, rol } = userData;
 
-        // El rol es opcional ya que la DB tiene un DEFAULT 'user'
         const [result] = await pool.query(
-            "INSERT INTO usuarios (documento, nombre, rol) VALUES (?, ?, ?)",
-            [documento, nombre, rol || 'user']
+            "INSERT INTO usuarios (documento, nombre, username, password_hash, rol) VALUES (?, ?, ?, ?, ?)",
+            [documento, nombre, username, password_hash, rol || "user"]
         );
 
-        // Retornamos el usuario recién creado
         const [newUser] = await pool.query(
-            "SELECT * FROM usuarios WHERE id = ?",
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios WHERE id = ?",
             [result.insertId]
         );
         return newUser[0];
@@ -61,7 +75,7 @@ export const UserModel = {
         if (result.affectedRows === 0) return null;
 
         const [updatedUser] = await pool.query(
-            "SELECT * FROM usuarios WHERE id = ?",
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios WHERE id = ?",
             [id]
         );
         return updatedUser[0];
@@ -81,7 +95,7 @@ export const UserModel = {
         if (result.affectedRows === 0) return null;
 
         const [updatedUser] = await pool.query(
-            "SELECT * FROM usuarios WHERE id = ?",
+            "SELECT id, documento, nombre, username, rol, creado_en, actualizado_en FROM usuarios WHERE id = ?",
             [id]
         );
         return updatedUser[0];
