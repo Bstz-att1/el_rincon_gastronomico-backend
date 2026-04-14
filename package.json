@@ -1,0 +1,29 @@
+{
+  "name": "rincon_gastronomico-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bstz-att1/el_rincon_grastronomico-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Bstz-att1/el_rincon_grastronomico-backend/issues"
+  },
+  "homepage": "https://github.com/Bstz-att1/el_rincon_grastronomico-backend#readme"
+}
