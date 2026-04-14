@@ -2,6 +2,7 @@
 //      CONTROLADOR CENTRADO EN USUARIOS
 //  ============================================ 
 
+import bcrypt from "bcryptjs";
 import { UserModel } from "../models/usuario.model.js";
 import { errorResponse, successResponse } from "../utils/response.handler.js";
 
@@ -34,21 +35,40 @@ export const getUserById = async (req, res) => {
 // Crea un nuevo usuario
 export const createUser = async (req, res) => {
     try {
-        const { documento, nombre, rol } = req.body;
+        const { documento, nombre, username, password, rol } = req.body;
 
-        if (!documento || !nombre) {
-            return errorResponse(res, 400, "Error al crear usuario", "Los campos documento y nombre son obligatorios")
+        if (!documento || !nombre || !username || !password) {
+            return errorResponse(
+                res,
+                400,
+                "Error al crear usuario",
+                "Los campos documento, nombre, username y password son obligatorios"
+            );
         }
 
-        const existingUser = await UserModel.findByDocumento(documento);
-        if (existingUser) {
-            return errorResponse(res, 409, "Error al crear usuario", `Ya existe un usuario con el documento ${documento}`)
+        const existingUserByDoc = await UserModel.findByDocumento(documento);
+        if (existingUserByDoc) {
+            return errorResponse(res, 409, "Error al crear usuario", `Ya existe un usuario con el documento ${documento}`);
         }
 
-        const newUser = await UserModel.create({ documento, nombre, rol });
+        const existingUserByUsername = await UserModel.findByUsername(username);
+        if (existingUserByUsername) {
+            return errorResponse(res, 409, "Error al crear usuario", `Ya existe un usuario con el username ${username}`);
+        }
+
+        const password_hash = await bcrypt.hash(password, 10);
+
+        const newUser = await UserModel.create({
+            documento,
+            nombre,
+            username,
+            password_hash,
+            rol: rol || "user",
+        });
+
         return successResponse(res, 200, "Usuario creado correctamente", newUser);
     } catch (error) {
-        errorResponse(res, 500, "Error del servidor", error.message)
+        return errorResponse(res, 500, "Error del servidor", error.message);
     }
 };
 
