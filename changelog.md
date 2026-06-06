@@ -852,3 +852,45 @@ Para bases de datos nuevas, el script `sql/database.sql` ya incluye todo el esqu
 | 🔄 Modificado | `src/routes/products.routes.js` |
 | 🔄 Modificado | `src/routes/audits.routes.js` |
 | 🔄 Modificado | `src/app.js` |
+
+---
+
+## [Unreleased] — 2026-06-06
+
+### Corregido
+
+- **`sql/data.sql`** — Los 4 hashes bcrypt del seed no correspondían a sus contraseñas documentadas. Causa: los hashes fueron generados con una herramienta diferente o se corrompieron. Se regeneraron y verificaron localmente con `bcryptjs` (cost 10) mediante el comando:
+  ```
+  node --input-type=module -e "import bcrypt from 'bcryptjs'; console.log(await bcrypt.hash('PASS', 10))"
+  ```
+  Hashes corregidos:
+  - `admin` → `Admin123!` → `$2a$10$koLIjddENG.yQNgD/WOL3.8RDKkZm5Wpua52EpRqyMVInwm3sDOTu`
+  - `maria` → `User123!`  → `$2a$10$u2noMHjJN2utpEF9QH90Wuk8w961Xo9oUh9Rnk4/DAHn1yfZpaPzK`
+  - `carlos` → `User123!` → `$2a$10$GwnSSCtJevFLuVYKF9WjhOGiwrgRDC0JI6tJLbq9NBoBJEKYAlOsO`
+  - `ana` → `Super123!`   → `$2a$10$yrnNHXCuI6dPpAWsLBfV7OvUEA61XZP3sh8lQnhmzYijajzHWvuYu`
+
+- **`sql/data.sql`** — Los nombres de usuario tenían el rol incrustado en el campo `name`, mezclando dato e identidad. Actualizados a nombres reales:
+  - `"Dario Admin"` → `"Dario Herrera"`
+  - `"Maria Usuario"` → `"Maria García"`
+  - `"Carlos Cocinero"` → `"Carlos Ramírez"`
+  - `"Ana Supervisora"` → `"Ana Martínez"`
+
+### SQL de aplicación en base de datos activa
+
+Para aplicar estos cambios sobre una base de datos ya inicializada sin re-ejecutar el seed completo:
+
+```sql
+USE rincon_gastronomico;
+
+-- Corregir hashes de contraseña
+UPDATE users SET password_hash = '$2a$10$koLIjddENG.yQNgD/WOL3.8RDKkZm5Wpua52EpRqyMVInwm3sDOTu' WHERE username = 'admin';
+UPDATE users SET password_hash = '$2a$10$u2noMHjJN2utpEF9QH90Wuk8w961Xo9oUh9Rnk4/DAHn1yfZpaPzK' WHERE username = 'maria';
+UPDATE users SET password_hash = '$2a$10$GwnSSCtJevFLuVYKF9WjhOGiwrgRDC0JI6tJLbq9NBoBJEKYAlOsO' WHERE username = 'carlos';
+UPDATE users SET password_hash = '$2a$10$yrnNHXCuI6dPpAWsLBfV7OvUEA61XZP3sh8lQnhmzYijajzHWvuYu' WHERE username = 'ana';
+
+-- Corregir nombres de usuario
+UPDATE users SET name = 'Dario Herrera'  WHERE username = 'admin';
+UPDATE users SET name = 'Maria García'   WHERE username = 'maria';
+UPDATE users SET name = 'Carlos Ramírez' WHERE username = 'carlos';
+UPDATE users SET name = 'Ana Martínez'   WHERE username = 'ana';
+```

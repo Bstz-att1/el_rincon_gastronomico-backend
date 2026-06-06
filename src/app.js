@@ -52,8 +52,12 @@ const app = express();
 //   Desarrollo  → CORS_ORIGIN=http://localhost:5173
 //   Producción  → CORS_ORIGIN=https://miapp.com
 //   Sin env     → permite todos los orígenes (solo aceptable en dev local)
+// Permite una lista de orígenes separada por comas en CORS_ORIGIN.
+// Ej: CORS_ORIGIN=http://localhost:5173,http://192.168.1.13:5173
+const rawOrigin = process.env.CORS_ORIGIN || "*";
+const allowedOrigins = rawOrigin.split(",").map((o) => o.trim()).filter(Boolean);
 const corsOptions = {
-    origin:         process.env.CORS_ORIGIN || "*",
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials:    true,
