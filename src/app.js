@@ -7,6 +7,8 @@ import productRouter from "./routes/producto.routes.js";
 import auditRouter from "./routes/auditoria.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import { successResponse } from "./utils/response.handler.js";
+import { globalErrorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
+
 const app = express();
 
 app.use(cors());
@@ -35,5 +37,11 @@ app.use("/productos", productRouter);
 
 // Ruta para auditoría
 app.use("/auditoria", auditRouter);
+
+// Middleware para rutas no encontradas
+app.use(notFoundHandler);
+
+// Middleware global de errores
+app.use(globalErrorHandler);
 
 export default app;
