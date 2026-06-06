@@ -21,7 +21,7 @@ import { catchAsync } from "../utils/catchAsync.js";
  *   roles.*       - roles.read, roles.create, roles.update, roles.delete
  *   categories.*  - categories.read, categories.create, categories.update, categories.delete
  *   products.*    - products.read, products.create, products.update, products.delete
- *   audit.*       - audit.read
+ *   audit.*       - audit.read, audit.create
  *
  * @param {string} requiredPermission - Codigo del permiso (ej: "products.create").
  * @returns {import("express").RequestHandler}

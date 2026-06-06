@@ -2,28 +2,29 @@ import { ZodError } from "zod";
 import { buildError } from "../utils/response.handler.js";
 
 // ============================================
-//   MIDDLEWARE DE VALIDACION CON ZOD
+//   MIDDLEWARE DE VALIDACIÓN CON ZOD
 // ============================================
 
 /**
  * Valida el body del request contra un esquema Zod.
  *
- * Si la validacion falla, construye una respuesta 400 con todos los errores
- * formateados de forma legible para el cliente.
+ * Si la validación falla, construye una respuesta 400 con todos los errores
+ * formateados de forma legible para el cliente (uno por campo inválido).
  *
- * Si la validacion pasa, reemplaza req.body con los datos parseados por Zod
- * (con coerciones, defaults y transformaciones aplicadas).
+ * Si la validación pasa, reemplaza req.body con los datos parseados por Zod
+ * (coerciones, valores por defecto y transformaciones ya aplicadas).
  *
- * @param {import("zod").ZodSchema} schema - Esquema Zod a usar para la validacion.
+ * @param {import("zod").ZodSchema} schema - Esquema Zod a usar para la validación.
  * @returns {import("express").RequestHandler}
  *
  * @example
  * import { createProductSchema } from "../schemas/products.schema.js";
- * router.post("/", authMiddleware, validate(createProductSchema), createProduct);
+ * router.post("/", authMiddleware, checkPermission("products.create"), validate(createProductSchema), createProduct);
  */
-export const validate = (schema) => (req, res, next) => {
+export const validate = (schema) => (req, _res, next) => {
     try {
-        // parseamos y sobreescribimos req.body con los datos transformados por Zod
+        // Parsear y sobreescribir req.body con los datos transformados por Zod.
+        // Esto garantiza que el controlador recibe datos limpios y tipados.
         req.body = schema.parse(req.body);
         next();
     } catch (err) {
@@ -34,6 +35,7 @@ export const validate = (schema) => (req, res, next) => {
             });
             return next(buildError("Error de validacion", 400, errors));
         }
+        // Error inesperado (no de Zod) — propagar al globalErrorHandler
         next(err);
     }
 };
