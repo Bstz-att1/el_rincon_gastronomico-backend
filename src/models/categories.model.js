@@ -1,97 +1,84 @@
-import pool from "../config/db.js";
+﻿import pool from "../config/db.js";
+
+// ============================================
+//       MODELO DE CATEGORIAS
+// ============================================
 
 export const CategoryModel = {
-    // 1. Obtener todas las categorías
+
+    // 1. Obtener todas las categorias
     findAll: async () => {
-        const [rows] = await pool.query(
-            "SELECT * FROM categorias"
-        );
+        const [rows] = await pool.query("SELECT * FROM categories ORDER BY name ASC");
         return rows;
     },
 
-    // 2. Obtener una categoría por ID
+    // 2. Obtener una categoria por ID
     findById: async (id) => {
         const [rows] = await pool.query(
-            "SELECT * FROM categorias WHERE id = ?",
+            "SELECT * FROM categories WHERE id = ?",
             [id]
         );
         return rows[0];
     },
 
-    // 3. Buscar por nombre (Para validaciones de duplicados)
-    findByNombre: async (nombre) => {
+    // 3. Buscar por nombre (para validacion de duplicados)
+    findByName: async (name) => {
         const [rows] = await pool.query(
-            "SELECT * FROM categorias WHERE nombre = ?",
-            [nombre]
+            "SELECT * FROM categories WHERE name = ?",
+            [name]
         );
         return rows[0];
     },
 
-    // 4. Crear una nueva categoría
-    create: async (categoryData) => {
-        const { nombre, descripcion } = categoryData;
-
+    // 4. Crear una nueva categoria
+    create: async ({ name, description }) => {
         const [result] = await pool.query(
-            "INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)",
-            [nombre, descripcion || null]
+            "INSERT INTO categories (name, description) VALUES (?, ?)",
+            [name, description ?? null]
         );
-
-        // Retornamos la categoría recién creada
         const [newCategory] = await pool.query(
-            "SELECT * FROM categorias WHERE id = ?",
+            "SELECT * FROM categories WHERE id = ?",
             [result.insertId]
         );
         return newCategory[0];
     },
 
-    // 5. Actualizar una categoría completamente ( PUT )
-    updateComplete: async (id, { nombre, descripcion }) => {
-        // Todos los campos son obligatorios
-        if (!nombre || !descripcion) {
-            throw new Error("Nombre y descripcion son requeridos");
-        }
-
+    // 5. Actualizar una categoria completamente (PUT)
+    update: async (id, { name, description }) => {
         const [result] = await pool.query(
-            "UPDATE categorias SET nombre = ?, descripcion = ? WHERE id = ?",
-            [nombre, descripcion, id]
+            "UPDATE categories SET name = ?, description = ? WHERE id = ?",
+            [name, description ?? null, id]
         );
-
-        // Verificar que sí se ejerció el cambio
         if (result.affectedRows === 0) return null;
 
-        const [updatedCategory] = await pool.query(
-            "SELECT * FROM categorias WHERE id = ?",
+        const [updated] = await pool.query(
+            "SELECT * FROM categories WHERE id = ?",
             [id]
         );
-        return updatedCategory[0];
+        return updated[0];
     },
 
-    // 6. Actualizar una categoría parcialmente ( PATCH )
-    updatePartial: async (id, updatedFields) => {
-        const { nombre, descripcion } = updatedFields;
-
-        // Solo actualizamos campos que vengan en el body
+    // 6. Actualizar una categoria parcialmente (PATCH)
+    patch: async (id, { name, description }) => {
         const [result] = await pool.query(
-            "UPDATE categorias SET nombre = COALESCE(?, nombre), descripcion = COALESCE(?, descripcion) WHERE id = ?",
-            [nombre, descripcion, id]
+            "UPDATE categories SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?",
+            [name ?? null, description ?? null, id]
         );
-
-        // Verificar que sí se ejerció el cambio
         if (result.affectedRows === 0) return null;
 
-        const [updatedCategory] = await pool.query(
-            "SELECT * FROM categorias WHERE id = ?",
+        const [patched] = await pool.query(
+            "SELECT * FROM categories WHERE id = ?",
             [id]
         );
-        return updatedCategory[0];
+        return patched[0];
     },
 
-    // 7. Eliminar una categoría
+    // 7. Eliminar una categoria
     delete: async (id) => {
         const [result] = await pool.query(
-            "DELETE FROM categorias WHERE id = ?",
+            "DELETE FROM categories WHERE id = ?",
             [id]
         );
         return result.affectedRows > 0;
-    }
+    },
 };

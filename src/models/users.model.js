@@ -1,148 +1,182 @@
-import pool from "../config/db.js";
+﻿import pool from "../config/db.js";
 
 // ============================================
 //          MODELO DE USUARIOS
 // ============================================
 
-/**
- * Columnas públicas del usuario (sin password_hash).
- * Se usa en todos los SELECT que no requieren la contraseña.
- *
- * Incluye token_version para que el authMiddleware pueda verificar
- * la validez del token tras un logout.
- */
-const PUBLIC_FIELDS =
-    "id, documento, nombre, username, rol, token_version, creado_en, actualizado_en";
+const PUBLIC_FIELDS = "u.id, u.document, u.name, u.username, u.token_version, u.created_at, u.updated_at";
+
+const FIND_WITH_ROLES = `
+    SELECT
+        u.id, u.document, u.name, u.username,
+        u.token_version, u.created_at, u.updated_at,
+        JSON_ARRAYAGG(r.name) AS roles
+    FROM users u
+    LEFT JOIN user_roles ur ON u.id = ur.user_id
+    LEFT JOIN roles r       ON r.id = ur.role_id`;
 
 export const UserModel = {
 
-    // ── 1. Obtener todos los usuarios ─────────────────────────────────────
+    // 1. Obtener todos los usuarios con sus roles asignados
     findAll: async () => {
-        const [rows] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios`
-        );
+        const [rows] = await pool.query(`${FIND_WITH_ROLES} GROUP BY u.id`);
         return rows;
     },
 
-    // ── 2. Obtener un usuario por ID ──────────────────────────────────────
-    // Incluye token_version para que authMiddleware pueda validar la sesión.
+    // 2. Obtener un usuario por ID (con sus roles)
     findById: async (id) => {
         const [rows] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE id = ?`,
+            `${FIND_WITH_ROLES} WHERE u.id = ? GROUP BY u.id`,
             [id]
         );
         return rows[0];
     },
 
-    // ── 3. Obtener un usuario con su password_hash (solo para autenticación) ─
-    // Solo se usa en el login — no exponer en otro contexto.
+    // 3. Obtener usuario con password_hash â€” SOLO para autenticacion, no exponer
     findByUsername: async (username) => {
         const [rows] = await pool.query(
-            "SELECT * FROM usuarios WHERE username = ?",
+            "SELECT * FROM users WHERE username = ?",
             [username]
         );
         return rows[0];
     },
 
-    // ── 4. Buscar por documento (para validación de duplicados) ───────────
-    findByDocumento: async (documento) => {
+    // 4. Buscar por documento (para validacion de duplicados)
+    findByDocument: async (document) => {
         const [rows] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE documento = ?`,
-            [documento]
+            `SELECT ${PUBLIC_FIELDS} FROM users u WHERE u.document = ?`,
+            [document]
         );
         return rows[0];
     },
 
-    // ── 5. Buscar por username sin password (para validación de duplicados) ─
+    // 5. Buscar por username publico (para validacion de duplicados)
     findByUsernamePublic: async (username) => {
         const [rows] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE username = ?`,
+            `SELECT ${PUBLIC_FIELDS} FROM users u WHERE u.username = ?`,
             [username]
         );
         return rows[0];
     },
 
-    // ── 6. Crear un nuevo usuario ─────────────────────────────────────────
-    create: async (userData) => {
-        const { documento, nombre, username, password_hash, rol } = userData;
+    // 6. Crear un nuevo usuario y asignar sus roles (transaccion atomica)
+    create: async ({ document, name, username, password_hash, roleIds }) => {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
 
-        const [result] = await pool.query(
-            "INSERT INTO usuarios (documento, nombre, username, password_hash, rol) VALUES (?, ?, ?, ?, ?)",
-            [documento, nombre, username, password_hash, rol || "user"]
-        );
+            const [result] = await connection.query(
+                "INSERT INTO users (document, name, username, password_hash) VALUES (?, ?, ?, ?)",
+                [document, name, username, password_hash]
+            );
+            const userId = result.insertId;
 
-        const [newUser] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE id = ?`,
-            [result.insertId]
-        );
-        return newUser[0];
-    },
+            if (roleIds && roleIds.length > 0) {
+                const roleValues = roleIds.map((roleId) => [userId, roleId]);
+                await connection.query("INSERT INTO user_roles (user_id, role_id) VALUES ?", [roleValues]);
+            }
 
-    // ── 7. Actualizar completamente ( PUT ) ───────────────────────────────
-    updateComplete: async (id, { nombre, rol }) => {
-        if (!nombre || !rol) {
-            throw new Error("Nombre y rol son requeridos para actualización completa.");
+            await connection.commit();
+
+            const [newUser] = await pool.query(
+                `${FIND_WITH_ROLES} WHERE u.id = ? GROUP BY u.id`,
+                [userId]
+            );
+            return newUser[0];
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
         }
-
-        const [result] = await pool.query(
-            "UPDATE usuarios SET nombre = ?, rol = ? WHERE id = ?",
-            [nombre, rol, id]
-        );
-
-        if (result.affectedRows === 0) return null;
-
-        const [updatedUser] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE id = ?`,
-            [id]
-        );
-        return updatedUser[0];
     },
 
-    // ── 8. Actualizar parcialmente ( PATCH ) ──────────────────────────────
-    updatePartial: async (id, updatedFields) => {
-        const { nombre, rol } = updatedFields;
+    // 7. Actualizar nombre y roles del usuario â€” PUT (reemplazo total de roles)
+    update: async (id, { name, roleIds }) => {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
 
-        const [result] = await pool.query(
-            "UPDATE usuarios SET nombre = COALESCE(?, nombre), rol = COALESCE(?, rol) WHERE id = ?",
-            [nombre ?? null, rol ?? null, id]
-        );
+            await connection.query("UPDATE users SET name = ? WHERE id = ?", [name, id]);
+            await connection.query("DELETE FROM user_roles WHERE user_id = ?", [id]);
 
-        if (result.affectedRows === 0) return null;
+            if (roleIds && roleIds.length > 0) {
+                const roleValues = roleIds.map((roleId) => [id, roleId]);
+                await connection.query("INSERT INTO user_roles (user_id, role_id) VALUES ?", [roleValues]);
+            }
 
-        const [updatedUser] = await pool.query(
-            `SELECT ${PUBLIC_FIELDS} FROM usuarios WHERE id = ?`,
-            [id]
-        );
-        return updatedUser[0];
+            await connection.commit();
+
+            const [updated] = await pool.query(
+                `${FIND_WITH_ROLES} WHERE u.id = ? GROUP BY u.id`,
+                [id]
+            );
+            return updated[0];
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
     },
 
-    // ── 9. Eliminar un usuario ────────────────────────────────────────────
+    // 8. Actualizar campos de forma parcial â€” PATCH
+    patch: async (id, { name, roleIds }) => {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            if (name !== undefined) {
+                await connection.query("UPDATE users SET name = ? WHERE id = ?", [name, id]);
+            }
+            if (roleIds !== undefined) {
+                await connection.query("DELETE FROM user_roles WHERE user_id = ?", [id]);
+                if (roleIds.length > 0) {
+                    const roleValues = roleIds.map((roleId) => [id, roleId]);
+                    await connection.query("INSERT INTO user_roles (user_id, role_id) VALUES ?", [roleValues]);
+                }
+            }
+
+            await connection.commit();
+
+            const [patched] = await pool.query(
+                `${FIND_WITH_ROLES} WHERE u.id = ? GROUP BY u.id`,
+                [id]
+            );
+            return patched[0];
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    },
+
+    // 9. Eliminar un usuario del sistema
     delete: async (id) => {
-        const [result] = await pool.query(
-            "DELETE FROM usuarios WHERE id = ?",
-            [id]
-        );
+        const [result] = await pool.query("DELETE FROM users WHERE id = ?", [id]);
         return result.affectedRows > 0;
     },
 
-    // ── 10. Incrementar token_version (LOGOUT / Invalidación de sesión) ───
-    /**
-     * Incrementa el campo token_version del usuario en la base de datos.
-     *
-     * Efecto: todos los JWT emitidos ANTES de esta operación quedan inválidos
-     * automáticamente porque authMiddleware compara decoded.tokenVersion
-     * con el valor actual en la DB.
-     *
-     * Se usa en el endpoint POST /auth/logout.
-     *
-     * @param {number} id - ID del usuario a invalidar.
-     * @returns {boolean} true si la operación fue exitosa.
-     */
+    // 10. Incrementar token_version â€” invalida todos los JWT previos del usuario
+    // Se invoca en POST /auth/logout para cerrar sesion de forma segura.
     incrementTokenVersion: async (id) => {
         const [result] = await pool.query(
-            "UPDATE usuarios SET token_version = token_version + 1 WHERE id = ?",
+            "UPDATE users SET token_version = token_version + 1 WHERE id = ?",
             [id]
         );
         return result.affectedRows > 0;
+    },
+
+    // 11. Obtener nombres de roles del usuario (para el payload del JWT en login)
+    getRoleNamesByUserId: async (userId) => {
+        const [rows] = await pool.query(
+            `SELECT r.name
+             FROM roles r
+             JOIN user_roles ur ON r.id = ur.role_id
+             WHERE ur.user_id = ?`,
+            [userId]
+        );
+        return rows.map((r) => r.name);
     },
 };

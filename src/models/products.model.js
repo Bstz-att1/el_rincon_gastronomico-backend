@@ -1,87 +1,91 @@
-import pool from "../config/db.js";
+﻿import pool from "../config/db.js";
+
+// ============================================
+//       MODELO DE PRODUCTOS
+// ============================================
 
 export const ProductModel = {
-    // 1. Obtener todos los productos
+
+    // 1. Obtener todos los productos (con nombre de categoria)
     findAll: async () => {
         const [rows] = await pool.query(
-            "SELECT * FROM productos"
+            `SELECT p.*, c.name AS category_name
+             FROM products p
+             JOIN categories c ON c.id = p.category_id
+             ORDER BY p.name ASC`
         );
         return rows;
     },
 
-    // 2. Obtener un producto por ID
+    // 2. Obtener un producto por ID (con nombre de categoria)
     findById: async (id) => {
         const [rows] = await pool.query(
-            "SELECT * FROM productos WHERE id = ?",
+            `SELECT p.*, c.name AS category_name
+             FROM products p
+             JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ?`,
             [id]
         );
         return rows[0];
     },
 
     // 3. Crear un nuevo producto
-    create: async (productData) => {
-        const { nombre, descripcion, categoria_id, cantidad } = productData;
-
+    create: async ({ name, description, category_id, quantity }) => {
         const [result] = await pool.query(
-            "INSERT INTO productos (nombre, descripcion, categoria_id, cantidad) VALUES (?, ?, ?, ?)",
-            [nombre, descripcion || null, categoria_id, cantidad ?? 0]
+            "INSERT INTO products (name, description, category_id, quantity) VALUES (?, ?, ?, ?)",
+            [name, description ?? null, category_id, quantity ?? 0]
         );
-
-        // Retornamos el producto recién creado
         const [newProduct] = await pool.query(
-            "SELECT * FROM productos WHERE id = ?",
+            `SELECT p.*, c.name AS category_name
+             FROM products p JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ?`,
             [result.insertId]
         );
         return newProduct[0];
     },
 
-    // 4. Actualizar un producto completamente ( PUT )
-    updateComplete: async (id, { nombre, descripcion, categoria_id, cantidad }) => {
-        // Todos los campos obligatorios del update completo
-        if (!nombre || !categoria_id || cantidad === undefined || cantidad === null) {
-            throw new Error("Nombre, categoria_id y cantidad son requeridos");
-        }
-
+    // 4. Actualizar un producto completamente (PUT)
+    update: async (id, { name, description, category_id, quantity }) => {
         const [result] = await pool.query(
-            "UPDATE productos SET nombre = ?, descripcion = ?, categoria_id = ?, cantidad = ? WHERE id = ?",
-            [nombre, descripcion || null, categoria_id, cantidad, id]
+            "UPDATE products SET name = ?, description = ?, category_id = ?, quantity = ? WHERE id = ?",
+            [name, description ?? null, category_id, quantity, id]
         );
-
-        // Verificar que sí se ejerció el cambio
         if (result.affectedRows === 0) return null;
 
-        const [updatedProduct] = await pool.query(
-            "SELECT * FROM productos WHERE id = ?",
+        const [updated] = await pool.query(
+            `SELECT p.*, c.name AS category_name
+             FROM products p JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ?`,
             [id]
         );
-        return updatedProduct[0];
+        return updated[0];
     },
 
-    // 5. Actualizar un producto parcialmente ( PATCH )
-    updatePartial: async (id, updatedFields) => {
-        const { nombre, descripcion, categoria_id, cantidad } = updatedFields;
-
+    // 5. Actualizar un producto parcialmente (PATCH)
+    patch: async (id, { name, description, category_id, quantity }) => {
         const [result] = await pool.query(
-            "UPDATE productos SET nombre = COALESCE(?, nombre), descripcion = COALESCE(?, descripcion), categoria_id = COALESCE(?, categoria_id), cantidad = COALESCE(?, cantidad) WHERE id = ?",
-            [nombre, descripcion, categoria_id, cantidad, id]
+            `UPDATE products SET
+                name        = COALESCE(?, name),
+                description = COALESCE(?, description),
+                category_id = COALESCE(?, category_id),
+                quantity    = COALESCE(?, quantity)
+             WHERE id = ?`,
+            [name ?? null, description ?? null, category_id ?? null, quantity ?? null, id]
         );
-
-        // Verificar que sí se ejerció el cambio
         if (result.affectedRows === 0) return null;
 
-        const [updatedProduct] = await pool.query(
-            "SELECT * FROM productos WHERE id = ?",
+        const [patched] = await pool.query(
+            `SELECT p.*, c.name AS category_name
+             FROM products p JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ?`,
             [id]
         );
-        return updatedProduct[0];
+        return patched[0];
     },
 
     // 6. Eliminar un producto
     delete: async (id) => {
-        const [result] = await pool.query(
-            "DELETE FROM productos WHERE id = ?",
-            [id]
-        );
+        const [result] = await pool.query("DELETE FROM products WHERE id = ?", [id]);
         return result.affectedRows > 0;
-    }
+    },
 };

@@ -1,87 +1,47 @@
-import pool from "../config/db.js";
+﻿import pool from "../config/db.js";
+
+// ============================================
+//       MODELO DE AUDITORIA
+// ============================================
 
 export const AuditModel = {
-    // 1. Obtener todos los registros de auditoría
+
+    // 1. Obtener todos los registros de auditoria (con nombre de usuario)
     findAll: async () => {
         const [rows] = await pool.query(
-            "SELECT * FROM audit_logs"
+            `SELECT al.*, u.username AS user_name
+             FROM audit_logs al
+             JOIN users u ON u.id = al.user_id
+             ORDER BY al.created_at DESC`
         );
         return rows;
     },
 
-    // 2. Obtener un registro de auditoría por ID
+    // 2. Obtener un registro de auditoria por ID
     findById: async (id) => {
         const [rows] = await pool.query(
-            "SELECT * FROM audit_logs WHERE id = ?",
+            `SELECT al.*, u.username AS user_name
+             FROM audit_logs al
+             JOIN users u ON u.id = al.user_id
+             WHERE al.id = ?`,
             [id]
         );
         return rows[0];
     },
 
-    // 3. Crear un nuevo registro de auditoría
-    create: async (auditData) => {
-        const { usuario_id, accion, tabla_afectada, registro_id, detalles } = auditData;
-
+    // 3. Crear un nuevo registro de auditoria
+    // Los logs de auditoria son inmutables por diseno â€” solo se crean, no se editan.
+    create: async ({ user_id, action, affected_table, record_id, details }) => {
         const [result] = await pool.query(
-            "INSERT INTO audit_logs (usuario_id, accion, tabla_afectada, registro_id, detalles) VALUES (?, ?, ?, ?, ?)",
-            [usuario_id, accion, tabla_afectada, registro_id, detalles || null]
+            "INSERT INTO audit_logs (user_id, action, affected_table, record_id, details) VALUES (?, ?, ?, ?, ?)",
+            [user_id, action, affected_table, record_id, details ?? null]
         );
-
-        // Retornamos el registro recién creado
-        const [newAuditLog] = await pool.query(
-            "SELECT * FROM audit_logs WHERE id = ?",
+        const [newLog] = await pool.query(
+            `SELECT al.*, u.username AS user_name
+             FROM audit_logs al JOIN users u ON u.id = al.user_id
+             WHERE al.id = ?`,
             [result.insertId]
         );
-        return newAuditLog[0];
+        return newLog[0];
     },
-
-    // 4. Actualizar un registro completamente ( PUT )
-    updateComplete: async (id, { usuario_id, accion, tabla_afectada, registro_id, detalles }) => {
-        // Campos obligatorios para actualización completa
-        if (!usuario_id || !accion || !tabla_afectada || !registro_id) {
-            throw new Error("usuario_id, accion, tabla_afectada y registro_id son requeridos");
-        }
-
-        const [result] = await pool.query(
-            "UPDATE audit_logs SET usuario_id = ?, accion = ?, tabla_afectada = ?, registro_id = ?, detalles = ? WHERE id = ?",
-            [usuario_id, accion, tabla_afectada, registro_id, detalles || null, id]
-        );
-
-        // Verificar que sí se ejerció el cambio
-        if (result.affectedRows === 0) return null;
-
-        const [updatedAuditLog] = await pool.query(
-            "SELECT * FROM audit_logs WHERE id = ?",
-            [id]
-        );
-        return updatedAuditLog[0];
-    },
-
-    // 5. Actualizar un registro parcialmente ( PATCH )
-    updatePartial: async (id, updatedFields) => {
-        const { usuario_id, accion, tabla_afectada, registro_id, detalles } = updatedFields;
-
-        const [result] = await pool.query(
-            "UPDATE audit_logs SET usuario_id = COALESCE(?, usuario_id), accion = COALESCE(?, accion), tabla_afectada = COALESCE(?, tabla_afectada), registro_id = COALESCE(?, registro_id), detalles = COALESCE(?, detalles) WHERE id = ?",
-            [usuario_id, accion, tabla_afectada, registro_id, detalles, id]
-        );
-
-        // Verificar que sí se ejerció el cambio
-        if (result.affectedRows === 0) return null;
-
-        const [updatedAuditLog] = await pool.query(
-            "SELECT * FROM audit_logs WHERE id = ?",
-            [id]
-        );
-        return updatedAuditLog[0];
-    },
-
-    // 6. Eliminar un registro de auditoría
-    delete: async (id) => {
-        const [result] = await pool.query(
-            "DELETE FROM audit_logs WHERE id = ?",
-            [id]
-        );
-        return result.affectedRows > 0;
-    }
 };
