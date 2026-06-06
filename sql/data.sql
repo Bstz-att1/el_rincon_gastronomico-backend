@@ -1,85 +1,110 @@
 -- ============================================
--- PARTE 4: INSERTAR DATOS DE PRUEBA
+-- DATOS SEMILLA -- RINCON GASTRONOMICO
 -- ============================================
 
--- --------------------------------------------
--- USUARIOS
--- --------------------------------------------
+USE rincon_gastronomico;
 
-INSERT INTO usuarios (documento, nombre, username, password_hash, rol) VALUES
-('0012345678', 'Dario Admin', 'admin', '$2a$10$nPz.7zemuEFA55BNDS7aju8Atrk9K9WYaKOOwcsG7gHjnpoz0ZBd.', 'admin'),
-('0098765432', 'Maria Usuario', 'maria', '$2a$10$JdqkIGmT5wIoIo.X5afS4OgMiggCMW2.gjwYXZMKWsKQ5f151b2am', 'user'),
-('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$PcPK3b3QRKKSY6.fkFV/.eyktSzGRhYXOmmZwyQdu25TdcPRGZVsu', 'user'),
-('0033333333', 'Ana Recepcionista', 'ana', '$2a$10$Gd/T3MvNwffObcngZFuCSeYSZBZB2aVNs4.OWrIvOKzeq2zYsaS2y', 'user');
+-- 1. ROLES DEL SISTEMA (is_system = 1 -> protegidos, no eliminables via API)
+INSERT INTO roles (name, description, is_system) VALUES
+('admin',      'Acceso total al sistema. Gestiona usuarios, roles, productos, categorias y auditoria.', 1),
+('supervisor', 'Gestiona productos y categorias, consulta auditoria y usuarios, sin eliminar.', 1),
+('user',       'Usuario basico. Solo puede consultar productos y categorias.', 1);
 
--- --------------------------------------------
--- CATEGORIAS
--- --------------------------------------------
+-- 2. PERMISOS DEL SISTEMA (patron: resource.action)
+INSERT INTO permissions (code, description, resource) VALUES
+('users.read',        'Consultar la lista y detalle de usuarios',              'users'),
+('users.create',      'Registrar nuevos usuarios en el sistema',               'users'),
+('users.update',      'Actualizar datos de usuarios existentes',               'users'),
+('users.delete',      'Eliminar usuarios del sistema',                         'users'),
+('roles.read',        'Consultar roles y sus permisos asignados',              'roles'),
+('roles.create',      'Crear nuevos roles con sus permisos',                   'roles'),
+('roles.update',      'Actualizar nombre, descripcion y permisos de un rol',   'roles'),
+('roles.delete',      'Eliminar roles del sistema',                            'roles'),
+('categories.read',   'Consultar lista y detalle de categorias',               'categories'),
+('categories.create', 'Registrar nuevas categorias',                           'categories'),
+('categories.update', 'Actualizar datos de categorias existentes',             'categories'),
+('categories.delete', 'Eliminar categorias del sistema',                       'categories'),
+('products.read',     'Consultar lista y detalle de productos',                'products'),
+('products.create',   'Registrar nuevos productos',                            'products'),
+('products.update',   'Actualizar datos de productos existentes',              'products'),
+('products.delete',   'Eliminar productos del sistema',                        'products'),
+('audit.read',        'Consultar registros de auditoria del sistema',          'audit');
 
-INSERT INTO categorias (nombre, descripcion) VALUES
-('Bebidas', 'Bebidas calientes, frías y refrescos'),
-('Entradas', 'Aperitivos y entradas para comenzar la comida'),
-('Platos Fuertes', 'Platos principales con proteínas y acompañamientos'),
-('Postres', 'Dulces y postres para finalizar la comida'),
-('Desayunos', 'Opciones de desayuno tradicional y continental');
+-- 3. ASIGNACION DE PERMISOS A ROLES
 
--- --------------------------------------------
--- PRODUCTOS
--- --------------------------------------------
+-- Rol ADMIN -> todos los permisos
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'admin';
 
-INSERT INTO productos (nombre, descripcion, categoria_id, cantidad) VALUES
--- Bebidas
-('Cafe Americano', 'Cafe negro tradicional', 1, 50),
-('Jugo de Naranja', 'Jugo natural exprimido', 1, 30),
-('Limonada Natural', 'Limonada con azucar y hierbabuena', 1, 40),
+-- Rol SUPERVISOR -> gestion de productos/categorias + lectura
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.code IN (
+    'users.read', 'roles.read',
+    'categories.read', 'categories.create', 'categories.update',
+    'products.read',   'products.create',   'products.update',
+    'audit.read'
+)
+WHERE r.name = 'supervisor';
 
--- Entradas
-('Ensalada Cesar', 'Lechuga, crutones, aderezo cesar y parmesano', 2, 20),
-('Sopa de Tomate', 'Sopa cremosa de tomate con albahaca', 2, 15),
+-- Rol USER -> solo consulta
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.code IN ('categories.read', 'products.read')
+WHERE r.name = 'user';
 
--- Platos Fuertes
-('Pasta Alfredo', 'Fettuccine en salsa alfredo con pollo', 3, 20),
-('Hamburguesa Clasica', 'Carne 200gr, queso cheddar, lechuga y tomate', 3, 30),
+-- 4. USUARIOS DE PRUEBA
+-- Contrasenas hasheadas bcrypt (cost 10):
+--   admin  -> Admin123!   |  maria  -> User123!
+--   carlos -> User123!    |  ana    -> Super123!
+INSERT INTO users (document, name, username, password_hash) VALUES
+('0012345678', 'Dario Admin',     'admin',  '$2a$10$nPz.7zemuEFA55BNDS7aju8Atrk9K9WYaKOOwcsG7gHjnpoz0ZBd.'),
+('0098765432', 'Maria Usuario',   'maria',  '$2a$10$JdqkIGmT5wIoIo.X5afS4OgMiggCMW2.gjwYXZMKWsKQ5f151b2am'),
+('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$PcPK3b3QRKKSY6.fkFV/.eyktSzGRhYXOmmZwyQdu25TdcPRGZVsu'),
+('0033333333', 'Ana Supervisora', 'ana',    '$2a$10$Gd/T3MvNwffObcngZFuCSeYSZBZB2aVNs4.OWrIvOKzeq2zYsaS2y');
 
--- Postres
-('Cheesecake', 'Tarta de queso con frutos rojos', 4, 15),
+-- 5. ASIGNACION DE ROLES A USUARIOS
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u, roles r WHERE u.username = 'admin'  AND r.name = 'admin';
 
--- Desayunos
-('Panqueques', 'Panqueques con miel y frutas', 5, 18);
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u, roles r WHERE u.username = 'maria'  AND r.name = 'user';
 
--- --------------------------------------------
--- AUDIT_LOGS - Acciones CRUD del sistema
--- --------------------------------------------
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u, roles r WHERE u.username = 'carlos' AND r.name = 'user';
 
-INSERT INTO audit_logs (usuario_id, accion, tabla_afectada, registro_id, detalles) VALUES
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u, roles r WHERE u.username = 'ana'    AND r.name = 'supervisor';
 
--- CREAR: Categorias
-(1, 'CREAR', 'categorias', 1, 'Creacion de categoria: Bebidas'),
-(1, 'CREAR', 'categorias', 2, 'Creacion de categoria: Entradas'),
-(1, 'CREAR', 'categorias', 3, 'Creacion de categoria: Platos Fuertes'),
-(1, 'CREAR', 'categorias', 4, 'Creacion de categoria: Postres'),
-(1, 'CREAR', 'categorias', 5, 'Creacion de categoria: Desayunos'),
+-- 6. CATEGORIAS
+INSERT INTO categories (name, description) VALUES
+('Beverages',    'Bebidas calientes, frias y refrescos'),
+('Starters',     'Aperitivos y entradas para comenzar la comida'),
+('Main Courses', 'Platos principales con proteinas y acompañamientos'),
+('Desserts',     'Dulces y postres para finalizar la comida'),
+('Breakfasts',   'Opciones de desayuno tradicional y continental');
 
--- CREAR: Productos
-(1, 'CREAR', 'productos', 1, 'Creacion de producto: Cafe Americano'),
-(1, 'CREAR', 'productos', 2, 'Creacion de producto: Jugo de Naranja'),
-(2, 'CREAR', 'productos', 3, 'Creacion de producto: Limonada Natural'),
-(3, 'CREAR', 'productos', 4, 'Creacion de producto: Ensalada Cesar'),
-(3, 'CREAR', 'productos', 5, 'Creacion de producto: Sopa de Tomate'),
-(2, 'CREAR', 'productos', 6, 'Creacion de producto: Pasta Alfredo'),
-(3, 'CREAR', 'productos', 7, 'Creacion de producto: Hamburguesa Clasica'),
-(2, 'CREAR', 'productos', 8, 'Creacion de producto: Cheesecake'),
-(3, 'CREAR', 'productos', 9, 'Creacion de producto: Panqueques'),
+-- 7. PRODUCTOS
+INSERT INTO products (name, description, category_id, quantity) VALUES
+('Americano Coffee', 'Cafe negro tradicional',                         1, 50),
+('Orange Juice',     'Jugo natural exprimido',                         1, 30),
+('Lemonade',         'Limonada con azucar y hierbabuena',              1, 40),
+('Caesar Salad',     'Lechuga, crutones, aderezo cesar y parmesano',   2, 20),
+('Tomato Soup',      'Sopa cremosa de tomate con albahaca',            2, 15),
+('Alfredo Pasta',    'Fettuccine en salsa alfredo con pollo',          3, 20),
+('Classic Burger',   'Carne 200gr, queso cheddar, lechuga y tomate',   3, 30),
+('Cheesecake',       'Tarta de queso con frutos rojos',                4, 15),
+('Pancakes',         'Panqueques con miel y frutas',                   5, 18);
 
--- ACTUALIZAR: Modificaciones completas
-(1, 'ACTUALIZAR', 'productos', 1, 'Actualizacion completa: Cafe Americano - stock 40, descripcion modificada'),
-(2, 'ACTUALIZAR', 'productos', 3, 'Actualizacion completa: Limonada Natural - nombre cambiado a Limonada Hierbabuena'),
-
--- ACTUALIZAR PARCIALMENTE: Cambios específicos
-(1, 'ACTUALIZAR PARCIALMENTE', 'productos', 1, 'Cambio de stock: 40 -> 55 unidades'),
-(3, 'ACTUALIZAR PARCIALMENTE', 'productos', 7, 'Cambio de categoria: 3 -> 2'),
-(2, 'ACTUALIZAR PARCIALMENTE', 'productos', 6, 'Cambio de descripcion: agregado ingrediente parmesano'),
-
--- ELIMINAR: Eliminaciones de registros
-(2, 'ELIMINAR', 'productos', 2, 'Eliminacion de producto: Jugo de Naranja - descontinuado'),
-(1, 'ELIMINAR', 'categorias', 5, 'Eliminacion de categoria: Desayunos - fusionada con Platos Fuertes');
+-- 8. AUDITORIA INICIAL
+INSERT INTO audit_logs (user_id, action, affected_table, record_id, details) VALUES
+(1, 'CREATE',         'categories', 1, 'Creacion de categoria: Beverages'),
+(1, 'CREATE',         'categories', 2, 'Creacion de categoria: Starters'),
+(1, 'CREATE',         'categories', 3, 'Creacion de categoria: Main Courses'),
+(1, 'CREATE',         'products',   1, 'Creacion de producto: Americano Coffee'),
+(1, 'CREATE',         'products',   6, 'Creacion de producto: Alfredo Pasta'),
+(1, 'UPDATE',         'products',   1, 'Actualizacion stock: Americano Coffee -> 50 unidades'),
+(4, 'CREATE',         'products',   4, 'Creacion de producto: Caesar Salad'),
+(4, 'PARTIAL UPDATE', 'products',   3, 'Cambio de nombre: Lemonade Natural');
