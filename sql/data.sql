@@ -63,10 +63,10 @@ WHERE r.name = 'user';
 --   admin  → Admin123!   |  ana    → Super123!
 --   maria  → User123!    |  carlos → User123!
 INSERT INTO users (document, name, username, password_hash) VALUES
-('0012345678', 'Dario Admin',     'admin',  '$2a$10$nPz.7zemuEFA55BNDS7aju8Atrk9K9WYaKOOwcsG7gHjnpoz0ZBd.'),
-('0098765432', 'Maria Usuario',   'maria',  '$2a$10$JdqkIGmT5wIoIo.X5afS4OgMiggCMW2.gjwYXZMKWsKQ5f151b2am'),
-('0055555555', 'Carlos Cocinero', 'carlos', '$2a$10$PcPK3b3QRKKSY6.fkFV/.eyktSzGRhYXOmmZwyQdu25TdcPRGZVsu'),
-('0033333333', 'Ana Supervisora', 'ana',    '$2a$10$Gd/T3MvNwffObcngZFuCSeYSZBZB2aVNs4.OWrIvOKzeq2zYsaS2y');
+('0012345678', 'Dario Herrera',   'admin',  '$2a$10$koLIjddENG.yQNgD/WOL3.8RDKkZm5Wpua52EpRqyMVInwm3sDOTu'),
+('0098765432', 'Maria García',    'maria',  '$2a$10$u2noMHjJN2utpEF9QH90Wuk8w961Xo9oUh9Rnk4/DAHn1yfZpaPzK'),
+('0055555555', 'Carlos Ramírez',  'carlos', '$2a$10$GwnSSCtJevFLuVYKF9WjhOGiwrgRDC0JI6tJLbq9NBoBJEKYAlOsO'),
+('0033333333', 'Ana Martínez',    'ana',    '$2a$10$yrnNHXCuI6dPpAWsLBfV7OvUEA61XZP3sh8lQnhmzYijajzHWvuYu');
 
 -- ── 5. ASIGNACIÓN DE ROLES A USUARIOS ────────────────────────────────────────
 INSERT INTO user_roles (user_id, role_id)
