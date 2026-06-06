@@ -1,6 +1,213 @@
 
 ---
 
+## 📦 Arquitectura de barriles (barrel pattern) + mejoras de schemas
+
+Se implementó el **patrón barril** (*barrel pattern*) en todos los módulos del proyecto: cada carpeta de `src/` cuenta ahora con un `index.js` que centraliza y re-exporta todo lo que el módulo expone. Esto elimina rutas de importación largas y frágiles, unifica el punto de acceso a cada capa y simplifica futuros refactors. En paralelo se realizaron mejoras de validación en los seis schemas Zod existentes.
+
+---
+
+### Nuevos archivos — archivos barril (`index.js`)
+
+#### `src/utils/index.js`
+Punto de entrada único para las utilidades globales del proyecto.
+
+**Exports:**
+- `catchAsync` — wrapper para handlers async de Express.
+- `successResponse`, `errorResponse`, `buildError`, `buildUnauthorizedError` — estandarización de respuestas HTTP.
+
+#### `src/config/index.js`
+Punto de entrada único para la configuración de la aplicación.
+
+**Exports:**
+- `pool` (named export) — pool de conexiones MySQL, re-exportado como named desde `db.js`.
+- `JWT_CONFIG`, `validateJWTConfig` — configuración y validación de JWT.
+
+> **Efecto secundario importante:** re-exportar `pool` desde `db.js` significa que cualquier módulo que importe desde `config/index.js` activa automáticamente el side-effect de verificación de conexión a MySQL, exactamente una vez (caché de módulos ES). El `import "./config/db.js"` explícito en `app.js` fue eliminado porque ahora es redundante.
+
+#### `src/models/index.js`
+Punto de entrada único para todos los modelos de la aplicación.
+
+**Exports:**
+- `AuditModel`, `CategoryModel`, `ProductModel`, `RoleModel`, `UserModel`.
+
+#### `src/schemas/index.js`
+Punto de entrada único para todos los schemas de validación Zod.
+
+**Exports por módulo:**
+- Auth: `loginSchema`
+- Auditoría: `createAuditLogSchema`
+- Categorías: `createCategorySchema`, `updateCategorySchema`, `patchCategorySchema`
+- Productos: `createProductSchema`, `updateProductSchema`, `patchProductSchema`
+- Roles: `createRoleSchema`, `updateRoleSchema`, `patchRoleSchema`
+- Usuarios: `createUserSchema`, `updateUserSchema`, `patchUserSchema`
+
+#### `src/controllers/index.js`
+Punto de entrada único para todos los controladores (18 funciones exportadas).
+
+**Exports por módulo:**
+- Auth: `login`, `logout`, `getMe`
+- Auditoría: `getAllAuditLogs`, `getAuditLogById`, `createAuditLog`
+- Categorías: `getAllCategories`, `getCategoryById`, `createCategory`, `updateCategoryComplete`, `updateCategoryPartial`, `deleteCategory`
+- Productos: `getAllProducts`, `getProductById`, `createProduct`, `updateProductComplete`, `updateProductPartial`, `deleteProduct`
+- Roles: `getAllRoles`, `getAllPermissions`, `getRoleById`, `getRolePermissions`, `createRole`, `updateRoleComplete`, `updateRolePartial`, `deleteRole`
+- Usuarios: `getAllUsers`, `getUserById`, `createUser`, `updateUserComplete`, `updateUserPartial`, `deleteUser`
+
+#### `src/middlewares/index.js`
+Punto de entrada único para todos los middlewares de la aplicación.
+
+**Exports:**
+- `authMiddleware` — verificación JWT y carga de `req.user`.
+- `checkPermission` — control de acceso RBAC por código de permiso.
+- `validate` — validación de body con schemas Zod.
+- `notFoundHandler`, `globalErrorHandler` — manejadores globales de error (registrar al final en `app.js`).
+
+#### `src/services/index.js`
+Punto de entrada único para los servicios de la aplicación.
+
+**Exports:**
+- `signToken`, `verifyToken`, `extractTokenFromHeader` — operaciones JWT del servicio de tokens.
+
+#### `src/routes/index.js`
+Punto de entrada único para todos los routers de Express.
+
+**Exports (re-exportados como named desde sus archivos):**
+- `authRouter`, `userRouter`, `categoryRouter`, `productRouter`, `auditRouter`, `roleRouter`.
+
+---
+
+### Mejoras en schemas Zod
+
+#### `src/schemas/auth.schema.js`
+- `username`: añadido `max(50)` — alineado con el límite de la columna en base de datos.
+- `password`: añadido `max(128)` — previene payloads excesivamente grandes sin exponer el límite real de bcrypt.
+
+#### `src/schemas/audits.schema.js`
+Refactor completo con campos reutilizables y validaciones más estrictas:
+
+- **`action`** (nuevo): se define la constante `VALID_ACTIONS` con la lista cerrada de acciones permitidas: `CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `LOGOUT`, `READ`, `RESTORE`, `ASSIGN`, `REVOKE`. El campo aplica `.toUpperCase()` para normalizar y `.refine()` para validar contra la lista. Antes solo había límites de longitud.
+- **`affected_table`** (nuevo): aplica `.toLowerCase()` + regex `/^[a-z][a-z0-9_]*$/` para garantizar formato `snake_case`. Antes solo había límites de longitud.
+- Todos los campos extraídos como constantes reutilizables: `userIdField`, `actionField`, `affectedTableField`, `recordIdField`, `detailsField`.
+- Comentario de permiso requerido corregido de `audit.read` a `audit.create`.
+
+#### `src/schemas/categories.schema.js`
+- `updateCategorySchema` (PUT): se introduce `descriptionPutField` que acepta `string | null | undefined`, permitiendo limpiar explícitamente la descripción enviando `null`. Antes se requería un string obligatorio.
+- Campos reutilizables documentados con JSDoc.
+
+#### `src/schemas/products.schema.js`
+- **`quantityField`**: cambiado de `.min(0, ...)` a `.nonnegative(...)` — semántica más precisa y descriptiva.
+- **`descriptionField`**: añadido `.nullable()` en todos los schemas para permitir limpiar el campo enviando `null` en operaciones PUT/PATCH.
+- JSDoc añadido a cada campo y schema de endpoint.
+
+#### `src/schemas/roles.schema.js`
+- **`permissionsField`**: añadida regex `/^[a-z_]+\.[a-z_]+$/` a cada elemento del array, forzando el formato `recurso.accion` (ej: `products.read`, `categories.create`). Antes solo se validaba que fuera un string no vacío, sin estructura.
+- Mensaje de error en `.refine()` del schema PATCH mejorado para listar los campos actualizables.
+
+#### `src/schemas/users.schema.js`
+- **`passwordField`**: límite cambiado de `max(100)` a `max(72)` — alineado con el límite real de bcrypt (72 bytes), que silenciosamente ignora los caracteres adicionales; dejar pasar contraseñas más largas puede dar una falsa sensación de seguridad.
+- **`passwordField`**: cadena de `.regex()` reemplazada por un único `.superRefine()` que acumula **todos** los errores de las cuatro reglas simultáneamente en lugar de detenerse en el primero. El cliente recibe todos los requisitos incumplidos en una sola respuesta.
+- Campos reutilizables documentados con JSDoc.
+
+---
+
+### Archivos modificados — actualización de imports
+
+Todos los archivos del proyecto actualizaron sus rutas de importación para consumir los barriles correspondientes en lugar de archivos individuales. Se detallan solo los cambios estructuralmente relevantes.
+
+#### `src/models/*.model.js` (5 archivos)
+- `import pool from "../config/db.js"` → `import { pool } from "../config/index.js"`.
+- El import pasa de default a named (el barril re-exporta `pool` como named export).
+
+#### `src/services/token.service.js`
+- `../config/jwt.config.js` → `../config/index.js`
+- `../utils/response.handler.js` → `../utils/index.js`
+
+#### `src/middlewares/auth.middleware.js`
+- `../models/users.model.js` → `../models/index.js`
+- `../utils/response.handler.js` → `../utils/index.js`
+- `../services/token.service.js` → `../services/index.js`
+
+#### `src/middlewares/error.middleware.js`
+- `../utils/response.handler.js` → `../utils/index.js`
+
+#### `src/middlewares/rbac.middleware.js`
+- `../models/roles.model.js` → `../models/index.js`
+- `../utils/response.handler.js` y `../utils/catchAsync.js` → consolidados en `../utils/index.js`
+
+#### `src/middlewares/validator.middleware.js`
+- `../utils/response.handler.js` → `../utils/index.js`
+
+#### `src/controllers/auth.controller.js`
+- Cuatro imports individuales → `../models/index.js`, `../utils/index.js`, `../services/index.js`, `../config/index.js`.
+
+#### `src/controllers/audits.controller.js`, `categories.controller.js`, `roles.controller.js`
+- Imports de model y utils → `../models/index.js` y `../utils/index.js`.
+
+#### `src/controllers/products.controller.js`
+- **Consolidación:** `ProductModel` y `CategoryModel` se importan desde un único `import { ProductModel, CategoryModel } from "../models/index.js"` en lugar de dos imports separados.
+
+#### `src/controllers/users.controller.js`
+- **Consolidación:** `UserModel` y `RoleModel` se importan desde un único `import { UserModel, RoleModel } from "../models/index.js"`.
+
+#### `src/routes/*.routes.js` (6 archivos)
+Cada ruta reemplaza tres grupos de imports individuales por tres imports de barril:
+- Controllers individuales → `../controllers/index.js`
+- Middlewares individuales (`authMiddleware`, `checkPermission`, `validate`) → `../middlewares/index.js` (único import)
+- Schemas individuales → `../schemas/index.js`
+
+#### `src/app.js`
+- `import "./config/db.js"` **eliminado** — el side-effect se activa automáticamente a través del barril de config.
+- `../config/jwt.config.js` → `./config/index.js`
+- Seis imports individuales de routers → un único import destructurado desde `./routes/index.js`.
+- `./utils/response.handler.js` → `./utils/index.js`
+- `./middlewares/error.middleware.js` → `./middlewares/index.js`
+
+---
+
+### Resumen de archivos por tipo de cambio
+
+| Tipo | Archivo |
+|------|---------|
+| ✅ Creado | `src/utils/index.js` — barril de utilidades |
+| ✅ Creado | `src/config/index.js` — barril de configuración |
+| ✅ Creado | `src/models/index.js` — barril de modelos |
+| ✅ Creado | `src/schemas/index.js` — barril de schemas |
+| ✅ Creado | `src/controllers/index.js` — barril de controladores |
+| ✅ Creado | `src/middlewares/index.js` — barril de middlewares |
+| ✅ Creado | `src/services/index.js` — barril de servicios |
+| ✅ Creado | `src/routes/index.js` — barril de rutas |
+| 🔧 Mejorado | `src/schemas/auth.schema.js` (max en username y password) |
+| 🔧 Mejorado | `src/schemas/audits.schema.js` (VALID_ACTIONS + regex affected_table) |
+| 🔧 Mejorado | `src/schemas/categories.schema.js` (description nullable en PUT) |
+| 🔧 Mejorado | `src/schemas/products.schema.js` (nonnegative + description nullable) |
+| 🔧 Mejorado | `src/schemas/roles.schema.js` (regex formato recurso.accion) |
+| 🔧 Mejorado | `src/schemas/users.schema.js` (max 72 bcrypt + superRefine) |
+| 🔄 Modificado | `src/models/audits.model.js` (import pool desde barril) |
+| 🔄 Modificado | `src/models/categories.model.js` (import pool desde barril) |
+| 🔄 Modificado | `src/models/products.model.js` (import pool desde barril) |
+| 🔄 Modificado | `src/models/roles.model.js` (import pool desde barril) |
+| 🔄 Modificado | `src/models/users.model.js` (import pool desde barril) |
+| 🔄 Modificado | `src/services/token.service.js` (imports a barriles) |
+| 🔄 Modificado | `src/middlewares/auth.middleware.js` (imports a barriles) |
+| 🔄 Modificado | `src/middlewares/error.middleware.js` (imports a barriles) |
+| 🔄 Modificado | `src/middlewares/rbac.middleware.js` (imports a barriles) |
+| 🔄 Modificado | `src/middlewares/validator.middleware.js` (imports a barriles) |
+| 🔄 Modificado | `src/controllers/auth.controller.js` (imports a barriles) |
+| 🔄 Modificado | `src/controllers/audits.controller.js` (imports a barriles) |
+| 🔄 Modificado | `src/controllers/categories.controller.js` (imports a barriles) |
+| 🔄 Modificado | `src/controllers/products.controller.js` (imports consolidados + barriles) |
+| 🔄 Modificado | `src/controllers/roles.controller.js` (imports a barriles) |
+| 🔄 Modificado | `src/controllers/users.controller.js` (imports consolidados + barriles) |
+| 🔄 Modificado | `src/routes/auth.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/routes/audits.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/routes/categories.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/routes/products.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/routes/roles.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/routes/users.routes.js` (imports a barriles) |
+| 🔄 Modificado | `src/app.js` (import db eliminado + todos los imports a barriles) |
+
+---
+
 ## 🔧 Revisión técnica final: documentación, robustez y seguridad
 
 Revisión integral del backend orientada a calidad de código, robustez operacional y preparación para el desarrollo del frontend. No se modificó la lógica de negocio existente; todos los cambios son mejoras estructurales, correcciones de bugs menores y documentación completa.
