@@ -13,11 +13,15 @@ const nameField = z
     .min(2,   "El nombre debe tener al menos 2 caracteres.")
     .max(150, "El nombre no puede superar 150 caracteres.");
 
-/** Descripción del producto: opcional, máximo 1000 caracteres. */
+/**
+ * Descripción del producto: opcional, máximo 1000 caracteres.
+ * Aceptar null también permite limpiar el campo en operaciones PUT.
+ */
 const descriptionField = z
     .string()
     .trim()
     .max(1000, "La descripcion no puede superar 1000 caracteres.")
+    .nullable()
     .optional();
 
 /** ID de categoría: entero positivo requerido. */
@@ -26,11 +30,14 @@ const categoryIdField = z
     .int("El 'category_id' debe ser un numero entero.")
     .positive("El 'category_id' debe ser un numero positivo.");
 
-/** Stock del producto: entero no negativo. */
+/**
+ * Stock del producto: entero no negativo.
+ * Se usa .nonnegative() en lugar de .min(0) para mayor semántica.
+ */
 const quantityField = z
     .number()
     .int("La 'quantity' debe ser un numero entero.")
-    .min(0, "La 'quantity' no puede ser negativa.");
+    .nonnegative("La 'quantity' no puede ser negativa.");
 
 // ── Esquemas de endpoints ────────────────────────────────────────────────────
 
@@ -47,8 +54,9 @@ export const createProductSchema = z.object({
 
 /**
  * PUT /products/:id
- * Reemplaza TODOS los datos del producto. Todos los campos son obligatorios.
- * quantity no tiene valor por defecto — debe enviarse explícitamente.
+ * Reemplaza TODOS los datos del producto.
+ * quantity debe enviarse explícitamente (sin valor por defecto).
+ * description puede enviarse como null para limpiar el campo.
  */
 export const updateProductSchema = z.object({
     name:        nameField,
