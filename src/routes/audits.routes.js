@@ -6,7 +6,7 @@ import {
     updateAuditLogComplete,
     updateAuditLogPartial,
     deleteAuditLog
-} from "../controllers/auditoria.controller.js";
+} from "../controllers/audits.controller.js";
 import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const auditRouter = Router();

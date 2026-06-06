@@ -1,10 +1,10 @@
 import express from "express";
 import cors from "cors";
 import "./config/db.js";
-import userRouter from "./routes/usuario.routes.js";
-import categoryRouter from "./routes/categoria.routes.js";
-import productRouter from "./routes/producto.routes.js";
-import auditRouter from "./routes/auditoria.routes.js";
+import userRouter from "./routes/users.routes.js";
+import categoryRouter from "./routes/categories.routes.js";
+import productRouter from "./routes/products.routes.js";
+import auditRouter from "./routes/audits.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import { successResponse } from "./utils/response.handler.js";
 import { globalErrorHandler, notFoundHandler } from "./middlewares/error.middleware.js";

@@ -6,7 +6,7 @@ import {
     updateProductComplete,
     updateProductPartial,
     deleteProduct
-} from "../controllers/producto.controller.js";
+} from "../controllers/products.controller.js";
 import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const productRouter = Router();

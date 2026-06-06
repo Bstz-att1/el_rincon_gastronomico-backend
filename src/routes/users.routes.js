@@ -6,7 +6,7 @@ import {
     updateUserComplete,
     updateUserPartial,
     deleteUser
-} from "../controllers/usuario.controller.js";
+} from "../controllers/users.controller.js";
 import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const userRouter = Router();

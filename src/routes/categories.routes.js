@@ -6,7 +6,7 @@ import {
     updateCategoryComplete,
     updateCategoryPartial,
     deleteCategory
-} from "../controllers/categoria.controller.js";
+} from "../controllers/categories.controller.js";
 import { authMiddleware, checkRole } from "../middlewares/auth.middleware.js";
 
 const categoryRouter = Router();
