@@ -1,33 +1,22 @@
 import { Router } from "express";
 import { login, logout, getMe } from "../controllers/auth.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
+import { validate } from "../middlewares/validator.middleware.js";
+import { loginSchema } from "../schemas/auth.schema.js";
+
+// ============================================
+// RUTAS DE AUTENTICACION
+// ============================================
 
 const authRouter = Router();
 
-// ============================================
-//          RUTAS DE AUTENTICACIÓN
-// ============================================
+// POST /auth/login -- Autenticar usuario (Zod valida el body antes del controlador)
+authRouter.post("/login", validate(loginSchema), login);
 
-/**
- * POST /auth/login
- * Pública — No requiere token.
- * Autentica al usuario y devuelve un JWT firmado.
- */
-authRouter.post("/login", login);
-
-/**
- * POST /auth/logout
- * Protegida — Requiere token válido.
- * Invalida todos los tokens del usuario incrementando token_version en la DB.
- */
+// POST /auth/logout -- Cerrar sesion e invalidar todos los tokens del usuario
 authRouter.post("/logout", authMiddleware, logout);
 
-/**
- * GET /auth/me
- * Protegida — Requiere token válido.
- * Devuelve la información del usuario autenticado actualmente.
- * Útil para que el frontend verifique el estado de la sesión.
- */
+// GET /auth/me -- Obtener datos del usuario autenticado actualmente
 authRouter.get("/me", authMiddleware, getMe);
 
 export default authRouter;
