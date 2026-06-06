@@ -1,5 +1,5 @@
 import { ZodError } from "zod";
-import { buildError } from "../utils/response.handler.js";
+import { buildError } from "../utils/index.js";
 
 // ============================================
 //   MIDDLEWARE DE VALIDACIÓN CON ZOD

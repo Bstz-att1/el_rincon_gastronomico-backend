@@ -10,7 +10,7 @@
 // Express reconoce un error-handler por tener EXACTAMENTE 4 parámetros.
 // ============================================
 
-import { errorResponse } from "../utils/response.handler.js";
+import { errorResponse } from "../utils/index.js";
 
 /**
  * Manejador de rutas no encontradas (404).

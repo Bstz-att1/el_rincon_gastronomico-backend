@@ -1,6 +1,6 @@
-import { CategoryModel } from "../models/categories.model.js";
-import { buildError, successResponse } from "../utils/response.handler.js";
-import { catchAsync } from "../utils/catchAsync.js";
+import { CategoryModel }              from "../models/index.js";
+import { buildError, successResponse } from "../utils/index.js";
+import { catchAsync }                  from "../utils/index.js";
 
 // ============================================
 //   CONTROLADOR DE CATEGORÍAS

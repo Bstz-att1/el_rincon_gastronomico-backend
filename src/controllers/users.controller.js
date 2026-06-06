@@ -1,8 +1,7 @@
 import bcrypt from "bcryptjs";
-import { UserModel } from "../models/users.model.js";
-import { RoleModel } from "../models/roles.model.js";
-import { buildError, successResponse } from "../utils/response.handler.js";
-import { catchAsync } from "../utils/catchAsync.js";
+import { UserModel, RoleModel }        from "../models/index.js";
+import { buildError, successResponse } from "../utils/index.js";
+import { catchAsync }                  from "../utils/index.js";
 
 // ============================================
 //      CONTROLADOR DE USUARIOS

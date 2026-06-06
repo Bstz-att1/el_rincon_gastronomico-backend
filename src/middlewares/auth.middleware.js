@@ -1,6 +1,6 @@
-import { UserModel } from "../models/users.model.js";
-import { buildError } from "../utils/response.handler.js";
-import { verifyToken, extractTokenFromHeader } from "../services/token.service.js";
+import { UserModel }                             from "../models/index.js";
+import { buildError }                             from "../utils/index.js";
+import { verifyToken, extractTokenFromHeader }    from "../services/index.js";
 
 // ============================================
 //   MIDDLEWARE DE AUTENTICACION JWT

@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
-import { UserModel } from "../models/users.model.js";
-import { buildError, successResponse } from "../utils/response.handler.js";
-import { catchAsync } from "../utils/catchAsync.js";
-import { signToken } from "../services/token.service.js";
-import { JWT_CONFIG } from "../config/jwt.config.js";
+import { UserModel }               from "../models/index.js";
+import { buildError, successResponse } from "../utils/index.js";
+import { catchAsync }              from "../utils/index.js";
+import { signToken }               from "../services/index.js";
+import { JWT_CONFIG }              from "../config/index.js";
 
 // ============================================
 //      CONTROLADOR DE AUTENTICACION
