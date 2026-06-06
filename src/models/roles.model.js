@@ -1,12 +1,32 @@
-﻿import pool from "../config/db.js";
+import pool from "../config/db.js";
 
 // ============================================
-//       MODELO DE ROLES (RBAC)
+//   MODELO DE ROLES (RBAC)
+// ============================================
+//
+// Gestiona roles, permisos y su relación para el sistema RBAC.
+//
+// Estructura de tablas relacionadas:
+//   roles              → definición del rol (id, name, description, is_system)
+//   permissions        → catálogo de permisos (id, code, resource, description)
+//   role_permissions   → relación N:M entre roles y permisos
+//   user_roles         → relación N:M entre usuarios y roles
+//
+// Restricciones de is_system:
+//   Los roles con is_system=1 son gestionados por la propia aplicación
+//   y no pueden eliminarse con delete() (la query incluye AND is_system=0).
+//   El controlador verifica is_system antes de llamar a update() o delete().
+//
+// Rendimiento:
+//   - getPermissionsByUserId se ejecuta en CADA request protegido.
+//     El índice idx_user_roles_user en user_roles.user_id garantiza rendimiento óptimo.
+//   - Se usa SELECT DISTINCT para evitar permisos duplicados cuando un
+//     usuario tiene múltiples roles con permisos en común.
 // ============================================
 
 export const RoleModel = {
 
-    // 1. Obtener todos los roles con sus permisos agregados
+    // 1. Obtener todos los roles con sus permisos agregados como JSON array
     findAll: async () => {
         const [rows] = await pool.query(
             `SELECT
@@ -23,7 +43,7 @@ export const RoleModel = {
         return rows;
     },
 
-    // 2. Obtener un rol por ID (con sus permisos)
+    // 2. Obtener un rol por ID con sus permisos
     findById: async (id) => {
         const [rows] = await pool.query(
             `SELECT
@@ -41,7 +61,7 @@ export const RoleModel = {
         return rows[0];
     },
 
-    // 3. Buscar un rol por nombre
+    // 3. Buscar un rol por nombre (para validación de duplicados)
     findByName: async (name) => {
         const [rows] = await pool.query(
             "SELECT * FROM roles WHERE name = ?",
@@ -50,7 +70,7 @@ export const RoleModel = {
         return rows[0];
     },
 
-    // 4. Obtener permisos de un rol especifico
+    // 4. Obtener los permisos asignados a un rol específico (vista plana, no JSON)
     findPermissionsByRoleId: async (roleId) => {
         const [rows] = await pool.query(
             `SELECT p.id, p.code, p.description, p.resource
@@ -63,8 +83,8 @@ export const RoleModel = {
         return rows;
     },
 
-    // 5. Buscar permisos por sus codigos (ej: ['users.read', 'products.create'])
-    // Usado para validar que los codigos enviados en el body existen en la DB.
+    // 5. Buscar permisos por array de códigos (ej: ['users.read', 'products.create'])
+    // Usado para validar que los códigos enviados en el body existen en la BD.
     findPermissionsByCodes: async (codes) => {
         if (!codes || codes.length === 0) return [];
         const [rows] = await pool.query(
@@ -74,7 +94,7 @@ export const RoleModel = {
         return rows;
     },
 
-    // 6. Obtener todos los permisos disponibles en el sistema
+    // 6. Obtener todos los permisos disponibles en el sistema (catálogo completo)
     findAllPermissions: async () => {
         const [rows] = await pool.query(
             "SELECT * FROM permissions ORDER BY resource, code"
@@ -82,9 +102,9 @@ export const RoleModel = {
         return rows;
     },
 
-    // 7. Obtener los codigos de permisos de un usuario (para RBAC por request)
-    // Consulta critica: se ejecuta en cada request protegido.
-    // El indice idx_user_roles_user garantiza rendimiento optimo.
+    // 7. Obtener los permisos de un usuario a través de sus roles (para RBAC por request)
+    // Consulta crítica: se ejecuta en CADA request protegido.
+    // Usa DISTINCT para evitar duplicados si el usuario tiene roles con permisos comunes.
     getPermissionsByUserId: async (userId) => {
         const [rows] = await pool.query(
             `SELECT DISTINCT p.id, p.code, p.resource, p.description
@@ -98,7 +118,8 @@ export const RoleModel = {
         return rows;
     },
 
-    // 8. Crear un nuevo rol con permisos (transaccion atomica)
+    // 8. Crear un nuevo rol con permisos (transacción atómica)
+    // Si la asignación de permisos falla, el rol NO queda creado.
     create: async ({ name, description, permissionIds }) => {
         const connection = await pool.getConnection();
         try {
@@ -120,6 +141,7 @@ export const RoleModel = {
 
             await connection.commit();
 
+            // Retornar el rol completo con permisos
             const [newRole] = await pool.query(
                 `SELECT
                     r.id, r.name, r.description, r.is_system, r.created_at,
@@ -142,16 +164,18 @@ export const RoleModel = {
         }
     },
 
-    // 9. Actualizar un rol (PUT o PATCH) con sus permisos
+    // 9. Actualizar un rol — sirve tanto para PUT como para PATCH.
+    // Solo actualiza los campos que vienen definidos (undefined = no tocar).
+    // Si permissionIds viene definido, reemplaza TODOS los permisos del rol.
     update: async (id, { name, description, permissionIds }) => {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
 
-            // Actualizar solo los campos que vienen definidos
+            // Construir SET dinámicamente según qué campos se envían
             const fields = [];
             const values = [];
-            if (name !== undefined)        { fields.push("name = ?");        values.push(name); }
+            if (name        !== undefined) { fields.push("name = ?");        values.push(name); }
             if (description !== undefined) { fields.push("description = ?"); values.push(description); }
 
             if (fields.length > 0) {
@@ -162,7 +186,7 @@ export const RoleModel = {
                 );
             }
 
-            // Reemplazar permisos si se envian
+            // Reemplazar permisos si se envían (DELETE + INSERT atómico)
             if (permissionIds !== undefined) {
                 await connection.query(
                     "DELETE FROM role_permissions WHERE role_id = ?",
@@ -179,6 +203,7 @@ export const RoleModel = {
 
             await connection.commit();
 
+            // Retornar el rol actualizado con permisos
             const [updated] = await pool.query(
                 `SELECT
                     r.id, r.name, r.description, r.is_system, r.created_at,
@@ -201,7 +226,9 @@ export const RoleModel = {
         }
     },
 
-    // 10. Eliminar un rol (solo si no es de sistema)
+    // 10. Eliminar un rol — la cláusula AND is_system=0 protege los roles del sistema
+    // a nivel de BD (segunda línea de defensa; la primera está en el controlador).
+    // Retorna true si se eliminó, false si no existía o era del sistema.
     delete: async (id) => {
         const [result] = await pool.query(
             "DELETE FROM roles WHERE id = ? AND is_system = 0",
