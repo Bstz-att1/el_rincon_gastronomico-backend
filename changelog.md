@@ -628,3 +628,65 @@ Cambios aplicados:
   - controlador: lógica de negocio
   - middleware: composición final de errores HTTP
 - Mayor facilidad para escalar reglas de error futuras (logging, trazabilidad, códigos internos, etc.).
+
+---
+
+## 🌐 Actualización reciente: Renombrado profesional de archivos a inglés (controllers/models/routes)
+
+Se realizó una normalización de nombres de archivos al inglés para facilitar mantenimiento en equipos técnicos.
+
+### Objetivo del cambio
+- Estandarizar naming técnico a inglés.
+- Evitar mezcla de español/inglés en estructura del backend.
+- Mantener funcionalidad intacta actualizando todas las importaciones relacionadas.
+
+### Renombres aplicados
+
+#### Controllers
+- `src/controllers/usuario.controller.js` → `src/controllers/users.controller.js`
+- `src/controllers/categoria.controller.js` → `src/controllers/categories.controller.js`
+- `src/controllers/producto.controller.js` → `src/controllers/products.controller.js`
+- `src/controllers/auditoria.controller.js` → `src/controllers/audits.controller.js`
+
+#### Models
+- `src/models/usuario.model.js` → `src/models/users.model.js`
+- `src/models/categoria.model.js` → `src/models/categories.model.js`
+- `src/models/producto.model.js` → `src/models/products.model.js`
+- `src/models/auditoria.model.js` → `src/models/audits.model.js`
+
+#### Routes
+- `src/routes/usuario.routes.js` → `src/routes/users.routes.js`
+- `src/routes/categoria.routes.js` → `src/routes/categories.routes.js`
+- `src/routes/producto.routes.js` → `src/routes/products.routes.js`
+- `src/routes/auditoria.routes.js` → `src/routes/audits.routes.js`
+
+### Archivos modificados por actualización de imports
+
+#### `src/app.js`
+Se actualizaron imports de rutas:
+- `./routes/users.routes.js`
+- `./routes/categories.routes.js`
+- `./routes/products.routes.js`
+- `./routes/audits.routes.js`
+
+#### Rutas
+- `src/routes/users.routes.js`
+  - ahora importa `../controllers/users.controller.js`
+- `src/routes/categories.routes.js`
+  - ahora importa `../controllers/categories.controller.js`
+- `src/routes/products.routes.js`
+  - ahora importa `../controllers/products.controller.js`
+- `src/routes/audits.routes.js`
+  - ahora importa `../controllers/audits.controller.js`
+
+#### Controladores
+- `src/controllers/users.controller.js`
+  - ahora importa `../models/users.model.js`
+- `src/controllers/categories.controller.js`
+  - ahora importa `../models/categories.model.js`
+- `src/controllers/products.controller.js`
+  - ahora importa `../models/products.model.js`
+- `src/controllers/audits.controller.js`
+  - ahora importa `../models/audits.model.js`
+- `src/controllers/auth.controller.js`
+  - ahora importa `../models/users.model.js`
