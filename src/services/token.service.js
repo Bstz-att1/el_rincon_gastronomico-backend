@@ -7,100 +7,83 @@ import { buildError } from "../utils/response.handler.js";
 // ============================================
 
 /**
- * Genera un token JWT firmado y con todos los claims de seguridad estándar.
+ * Genera un token JWT firmado con todos los claims de seguridad.
  *
  * Claims incluidos:
- *  - sub        : ID del usuario (subject estándar JWT)
- *  - id         : ID del usuario (alias explícito para compatibilidad)
- *  - username   : Nombre de usuario
- *  - nombre     : Nombre completo del usuario
- *  - rol        : Rol del usuario en el sistema
- *  - tokenVersion: Versión del token — permite invalidar sesiones previas al hacer logout
- *  - iss        : Emisor (issuer) — verifica que el token vino de esta API
- *  - aud        : Audiencia — verifica que el token está destinado a esta app
- *  - iat        : Fecha de emisión (issued at)
- *  - exp        : Fecha de expiración
+ *  - sub          : ID del usuario (subject estandar JWT)
+ *  - id           : ID del usuario (alias explicito para compatibilidad)
+ *  - username     : Nombre de usuario
+ *  - name         : Nombre completo del usuario
+ *  - roles        : Array de nombres de roles asignados al usuario
+ *  - tokenVersion : Version del token — invalida sesiones previas en logout
+ *  - iss          : Emisor (issuer)
+ *  - aud          : Audiencia
+ *  - iat / exp    : Fecha de emision / expiracion
  *
- * @param {object} user   - Objeto usuario (de la base de datos).
- * @returns {string}        Token JWT firmado.
+ * @param {object}   user      - Objeto usuario de la base de datos.
+ * @param {string[]} roleNames - Array de nombres de roles del usuario.
+ * @returns {string}             Token JWT firmado.
  */
-export const signToken = (user) => {
+export const signToken = (user, roleNames = []) => {
     const payload = {
-        sub: String(user.id),
-        id: user.id,
-        username: user.username,
-        nombre: user.nombre,
-        rol: user.rol,
-        // tokenVersion: permite invalidar todos los tokens anteriores cuando el
-        // usuario hace logout. Si el valor en la DB cambia, los tokens viejos fallan.
+        sub:          String(user.id),
+        id:           user.id,
+        username:     user.username,
+        name:         user.name,
+        roles:        roleNames,
+        // tokenVersion: invalida todos los tokens previos al hacer logout.
+        // Si el valor en DB cambia, los tokens viejos fallan en authMiddleware.
         tokenVersion: user.token_version ?? 0,
     };
 
     return jwt.sign(payload, JWT_CONFIG.secret, {
         expiresIn: JWT_CONFIG.expiresIn,
         algorithm: JWT_CONFIG.algorithm,
-        issuer: JWT_CONFIG.issuer,
-        audience: JWT_CONFIG.audience,
+        issuer:    JWT_CONFIG.issuer,
+        audience:  JWT_CONFIG.audience,
     });
 };
 
 /**
  * Verifica y decodifica un token JWT.
- * Valida: firma, algoritmo, issuer, audience y expiración.
+ * Valida: firma, algoritmo, issuer, audience y expiracion.
  *
- * En caso de error, lanza un AppError operacional con el código HTTP adecuado
- * y un mensaje descriptivo — nunca expone detalles de implementación.
+ * Lanza un AppError con codigo HTTP apropiado. Nunca expone detalles internos.
  *
- * @param {string} token  - Token JWT a verificar.
- * @returns {object}        Payload decodificado si el token es válido.
- * @throws {AppError}       Si el token es inválido, expirado o malformado.
+ * @param {string} token - Token JWT a verificar.
+ * @returns {object}       Payload decodificado si el token es valido.
  */
 export const verifyToken = (token) => {
     try {
-        const decoded = jwt.verify(token, JWT_CONFIG.secret, {
-            algorithms: [JWT_CONFIG.algorithm],   // Lista blanca de algoritmos (evita "alg: none")
-            issuer: JWT_CONFIG.issuer,
-            audience: JWT_CONFIG.audience,
-            complete: false,                       // Solo el payload decodificado
+        return jwt.verify(token, JWT_CONFIG.secret, {
+            algorithms: [JWT_CONFIG.algorithm], // Lista blanca de algoritmos (evita 'alg: none')
+            issuer:     JWT_CONFIG.issuer,
+            audience:   JWT_CONFIG.audience,
+            complete:   false,                  // Solo el payload decodificado
         });
-
-        return decoded;
-
     } catch (error) {
-        // ── Error: Token expirado ─────────────────────────────────────────
         if (error instanceof jwt.TokenExpiredError) {
             throw buildError(
-                "Sesión expirada",
-                401,
-                ["El token de acceso ha expirado. Por favor, inicie sesión nuevamente."]
+                "Sesion expirada", 401,
+                ["El token de acceso ha expirado. Por favor, inicie sesion nuevamente."]
             );
         }
-
-        // ── Error: Token aún no válido (nbf claim en el futuro) ──────────
         if (error instanceof jwt.NotBeforeError) {
             throw buildError(
-                "Token no activo",
-                401,
-                ["El token todavía no es válido. Verifique la configuración de fecha/hora."]
+                "Token no activo", 401,
+                ["El token todavia no es valido. Verifique la configuracion de fecha/hora."]
             );
         }
-
-        // ── Errores de formato / firma / algoritmo / issuer / audience ───
         if (error instanceof jwt.JsonWebTokenError) {
-            // Los detalles específicos del error NO se exponen al cliente
-            // para no revelar información que ayude a un atacante.
+            // No exponer detalles al cliente para no ayudar a un atacante
             throw buildError(
-                "Token inválido",
-                401,
-                ["El token de acceso es inválido o ha sido modificado."]
+                "Token invalido", 401,
+                ["El token de acceso es invalido o ha sido modificado."]
             );
         }
-
-        // ── Error inesperado ──────────────────────────────────────────────
         throw buildError(
-            "Error de autenticación",
-            500,
-            ["Ocurrió un error interno al verificar el token."]
+            "Error de autenticacion", 500,
+            ["Ocurrio un error interno al verificar el token."]
         );
     }
 };
@@ -108,36 +91,25 @@ export const verifyToken = (token) => {
 /**
  * Extrae y valida superficialmente el token del header Authorization.
  *
- * Valida:
- *  1. Existencia del header
- *  2. Prefijo "Bearer "
- *  3. Que el token no esté vacío
- *  4. Que tenga la estructura de 3 partes separadas por puntos (header.payload.signature)
- *
+ * Valida: existencia del header, prefijo "Bearer ", token no vacio y
+ * estructura de 3 partes (header.payload.signature).
  * NO verifica la firma — eso lo hace verifyToken().
  *
  * @param {string|undefined} authHeader - Valor del header Authorization.
- * @returns {string|null}                 Token extraído, o null si el header es inválido.
+ * @returns {string|null}                 Token extraido, o null si el header es invalido.
  */
 export const extractTokenFromHeader = (authHeader) => {
-    // Verificar que el header existe y es un string
     if (!authHeader || typeof authHeader !== "string") return null;
 
-    // Verificar que el header comienza con "Bearer " (con espacio)
     const BEARER_PREFIX = "Bearer ";
     if (!authHeader.startsWith(BEARER_PREFIX)) return null;
 
     const token = authHeader.slice(BEARER_PREFIX.length).trim();
-
-    // Verificar que el token no está vacío
     if (!token) return null;
 
-    // Verificar estructura básica de JWT: tres partes separadas por puntos
+    // Verificar estructura basica de JWT: tres partes separadas por puntos
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    // Verificar que cada parte tiene contenido (no está vacía)
-    if (parts.some((part) => part.length === 0)) return null;
+    if (parts.length !== 3 || parts.some((p) => p.length === 0)) return null;
 
     return token;
 };
