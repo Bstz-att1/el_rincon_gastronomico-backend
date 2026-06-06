@@ -1,6 +1,199 @@
 
 ---
 
+## 🔧 Revisión técnica final: documentación, robustez y seguridad
+
+Revisión integral del backend orientada a calidad de código, robustez operacional y preparación para el desarrollo del frontend. No se modificó la lógica de negocio existente; todos los cambios son mejoras estructurales, correcciones de bugs menores y documentación completa.
+
+### Correcciones de bugs
+
+#### `package.json`
+- **Bug crítico corregido:** el script `dev` apuntaba a `nodemon app.js` (archivo inexistente como entrypoint). Corregido a `nodemon server.js`.
+- **Script añadido:** `"start": "node server.js"` para entornos de producción.
+- Actualizado `description` y `keywords`.
+
+#### `src/schemas/products.schema.js`
+- **Bug lógico eliminado:** `updateProductSchema.quantity` tenía `.refine(v => v !== undefined, { message: "..." })`. Este refine es inalcanzable — Zod ya rechaza `undefined` antes de ejecutarlo cuando el campo no es `.optional()`. Se eliminó el refine redundante; el campo queda correctamente requerido sin él.
+
+#### `sql/data.sql`
+- **Permiso faltante añadido:** `audit.create` estaba documentado en el changelog anterior pero ausente del SQL. Se insertó la fila correspondiente en la tabla `permissions`. Total de permisos: 18 (antes 17).
+
+#### `src/routes/audits.routes.js`
+- **Permiso incorrecto corregido:** `POST /audit` usaba `checkPermission("audit.read")` (semánticamente erróneo para una operación de escritura). Corregido a `checkPermission("audit.create")`.
+- Se añadió el middleware `validate(createAuditLogSchema)` al endpoint POST (antes carecía de validación Zod).
+
+#### `src/controllers/audits.controller.js`
+- **Validación manual eliminada:** `createAuditLog` tenía validación manual de campos (`if (!user_id || !action...)`) que quedó obsoleta al delegar la validación a `validate(createAuditLogSchema)` en la ruta. Se eliminó el bloque redundante.
+
+---
+
+### Nuevos archivos
+
+#### `src/config/jwt.config.js` — Configuración y validación centralizadas de JWT
+
+Nuevo módulo que centraliza toda la configuración JWT y añade validación obligatoria al arranque. Antes, los valores JWT estaban directamente en `token.service.js` sin validación de seguridad.
+
+**Función `validateJWTConfig()`:**
+- Se llama UNA SOLA VEZ en `app.js`, antes de inicializar Express.
+- Valida que `JWT_SECRET` esté definida y tenga **mínimo 32 caracteres**.
+- Valida que `JWT_EXPIRES_IN` esté definida.
+- Si alguna validación falla, **lanza un `Error` que detiene la app** — no hay JWT inseguro por defecto.
+
+**Objeto `JWT_CONFIG`** (exportado como `Object.freeze` — inmutable en runtime):
+- `secret`:    `process.env.JWT_SECRET`
+- `expiresIn`: `process.env.JWT_EXPIRES_IN` (default: `"8h"`)
+- `algorithm`: `"HS256"` (fijo — lista blanca de algoritmos, evita ataque por sustitución de `alg`)
+- `issuer`:    `process.env.JWT_ISSUER`   (default: `"rincon-gastronomico-api"`)
+- `audience`:  `process.env.JWT_AUDIENCE` (default: `"rincon-gastronomico-app"`)
+
+Consumido por `src/services/token.service.js` (firmar/verificar tokens) y `src/controllers/auth.controller.js` (exponer `expires_in` en la respuesta del login).
+
+#### `src/schemas/audits.schema.js`
+Schema Zod para la ruta `POST /audit`:
+- `user_id`: entero positivo.
+- `action`: string 1–50 chars, normalizado a MAYÚSCULAS (`.toUpperCase()`).
+- `affected_table`: string 1–100 chars, normalizado a minúsculas (`.toLowerCase()`).
+- `record_id`: entero positivo.
+- `details`: string opcional, máximo 1000 chars.
+
+---
+
+### Mejoras de robustez y seguridad
+
+#### `server.js`
+- Almacena referencia del servidor: `const server = app.listen(...)`.
+- `process.on("uncaughtException")`: loguea el error y cierra el servidor antes de `process.exit(1)`.
+- `process.on("unhandledRejection")`: igual manejo para promesas rechazadas sin capturar.
+- `process.on("SIGTERM")`: cierre graceful sin código de error (`process.exit(0)`).
+- Mejora de logs de inicio con emojis y URL del servidor.
+
+#### `src/app.js`
+- **Validación JWT al arranque:** importa y llama a `validateJWTConfig()` desde `./config/jwt.config.js` antes de inicializar Express — la app no arranca con configuración JWT insegura.
+- **CORS endurecido:** reemplazado `cors()` (todos los orígenes) por opciones configurables vía `CORS_ORIGIN` en `.env`. Incluye `methods`, `allowedHeaders` y `credentials`.
+- **Límite de body:** añadido `limit: "10kb"` a `express.json()` y `express.urlencoded()` para mitigar ataques de payload masivo.
+- Respuesta del endpoint de salud (`GET /`) enriquecida con objeto `data` (versión y entorno).
+- Comentarios de sección numerados explicando el orden de los middlewares.
+
+#### `src/config/db.js`
+- **Fallo fatal:** añadido `process.exit(1)` en el `.catch()` de la verificación de conexión. La app no puede operar sin base de datos.
+- `timezone: "Z"` (UTC) para consistencia de timestamps entre servidor y DB.
+- `charset: "utf8mb4"` para soporte completo de Unicode (emojis, caracteres especiales).
+- Prefijo de log `[DB]` para mejor trazabilidad en consola.
+
+#### `.env.example` — Plantilla de entorno completamente documentada
+
+Archivo de plantilla de variables de entorno reescrito para reflejar todas las variables requeridas, con comentarios explicativos en cada sección.
+
+**Variables añadidas:**
+- `NODE_ENV`: entorno de ejecución. Valores válidos: `development` | `production` | `test`.
+- `CORS_ORIGIN`: origen del frontend permitido por la API. Ejemplos documentados:
+  - Desarrollo con Vite/React: `http://localhost:5173`
+  - Producción: `https://tudominio.com`
+  - Sin restricción (solo dev): `*`
+
+**Estructura de secciones resultante:**
+```
+── Servidor          → PORT, NODE_ENV
+── Base de datos     → DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+── JWT               → JWT_SECRET, JWT_EXPIRES_IN, JWT_ISSUER, JWT_AUDIENCE
+── CORS              → CORS_ORIGIN
+```
+
+**Mejoras de comentarios:**
+- Cabecera con instrucciones paso a paso: copiar archivo → rellenar valores → no subir `.env` al repositorio.
+- Comando de generación segura de `JWT_SECRET` (Node.js nativo, sin dependencias externas):
+  ```
+  node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+  ```
+- Descripción del propósito de `JWT_ISSUER` y `JWT_AUDIENCE` (validación multi-servicio).
+- Valor de `JWT_SECRET` en el ejemplo claramente marcado como placeholder obligatorio.
+
+---
+
+### Documentación y calidad de código
+
+#### `src/middlewares/error.middleware.js`
+- JSDoc completo para `notFoundHandler` y `globalErrorHandler`.
+- `globalErrorHandler` ahora loguea a consola solo los errores 500+ (los 4xx son flujo normal y no se loguean).
+- Parámetros no utilizados renombrados: `next` → `_next` (convención explícita de intención).
+- Comentario de sección explicando que ambos handlers deben registrarse al final de `app.js`.
+
+#### `src/utils/catchAsync.js`
+- JSDoc completo con `@param`, `@returns` y `@example`.
+
+#### `src/utils/response.handler.js`
+- JSDoc completo (`@param`, `@returns`) para las cuatro funciones exportadas: `successResponse`, `errorResponse`, `buildError`, `buildUnauthorizedError`.
+- Cabecera de archivo documenta la estructura del sobre de respuesta JSON: `{ success, message, data, errors }`.
+
+#### `src/middlewares/validator.middleware.js`
+- JSDoc actualizado con `@example` mejorado.
+- Parámetro no utilizado `res` renombrado a `_res`.
+- Comentario aclarando por qué errores no-Zod se propagan con `next(err)`.
+
+#### `src/middlewares/rbac.middleware.js`
+- Lista de permisos en JSDoc actualizada para incluir `audit.create` bajo `audit.*`.
+
+#### Controladores (JSDoc + mejoras menores)
+- `src/controllers/audits.controller.js`: JSDoc para los tres handlers; `_req` para parámetros no utilizados.
+- `src/controllers/categories.controller.js`: JSDoc completo; mensajes de error con template literals y comillas para los valores.
+- `src/controllers/products.controller.js`: JSDoc completo; `parseId` expandido a forma multilínea; `_req` donde corresponde.
+- `src/controllers/roles.controller.js`: JSDoc completo (handlers + helper `resolvePermissionIds`); `parseId` multilínea; mensajes de error mejorados.
+
+#### Modelos (cabeceras y comentarios)
+- `src/models/users.model.js`: corregidos artefactos de encoding UTF-8 (`â€"` → texto correcto); cabecera de archivo con principio `PUBLIC_FIELDS` y estrategia de transacciones; `ORDER BY u.id ASC` en `findAll()`; `ORDER BY r.name ASC` en `getRoleNamesByUserId()`.
+- `src/models/audits.model.js`: corregido artefacto de encoding; cabecera documentando inmutabilidad por diseño.
+- `src/models/categories.model.js`: cabecera con nota de constraint FK; comentarios mejorados; `patch()` reformateado.
+- `src/models/products.model.js`: cabecera explicando estrategia de JOIN para `category_name`.
+- `src/models/roles.model.js`: cabecera documentando estructura RBAC, restricciones `is_system` y notas de rendimiento.
+
+#### Rutas (cabeceras y reformateo)
+- `src/routes/auth.routes.js`: cabecera explicando todos los endpoints y sus requisitos de auth.
+- `src/routes/users.routes.js`: tabla de permisos por ruta; comentarios por endpoint.
+- `src/routes/categories.routes.js`: tabla de permisos; comentarios por endpoint.
+- `src/routes/products.routes.js`: tabla de permisos; comentarios por endpoint.
+- `src/routes/roles.routes.js`: tabla de permisos completa; nota crítica sobre el orden de registro de `GET /permissions` vs `GET /:id`.
+- `src/routes/audits.routes.js`: cabecera explicando la inmutabilidad de los registros de auditoría.
+
+---
+
+### Resumen de archivos por tipo de cambio
+
+| Tipo | Archivo |
+|------|---------|
+| ✅ Creado | `src/config/jwt.config.js` (validación obligatoria al arranque + configuración centralizada de JWT) |
+| ✅ Creado | `src/schemas/audits.schema.js` |
+| 🐛 Bug corregido | `package.json` (script `dev` apuntaba al archivo incorrecto) |
+| 🐛 Bug corregido | `src/schemas/products.schema.js` (`.refine()` inalcanzable eliminado) |
+| 🐛 Bug corregido | `sql/data.sql` (permiso `audit.create` faltante añadido) |
+| 🐛 Bug corregido | `src/routes/audits.routes.js` (permiso POST corregido a `audit.create`) |
+| 🐛 Bug corregido | `src/controllers/audits.controller.js` (validación manual redundante eliminada) |
+| 🔒 Seguridad | `src/app.js` (CORS configurable + límite de body 10kb) |
+| 💪 Robustez | `server.js` (manejadores de proceso + cierre graceful) |
+| 💪 Robustez | `src/config/db.js` (process.exit(1) en fallo de conexión + UTC + utf8mb4) |
+| 📝 Documentación | `src/middlewares/error.middleware.js` |
+| 📝 Documentación | `src/middlewares/rbac.middleware.js` (audit.create en JSDoc) |
+| 📝 Documentación | `src/middlewares/validator.middleware.js` |
+| 📝 Documentación | `src/utils/catchAsync.js` |
+| 📝 Documentación | `src/utils/response.handler.js` |
+| 📝 Documentación | `src/controllers/audits.controller.js` |
+| 📝 Documentación | `src/controllers/categories.controller.js` |
+| 📝 Documentación | `src/controllers/products.controller.js` |
+| 📝 Documentación | `src/controllers/roles.controller.js` |
+| 📝 Documentación | `src/models/users.model.js` |
+| 📝 Documentación | `src/models/audits.model.js` |
+| 📝 Documentación | `src/models/categories.model.js` |
+| 📝 Documentación | `src/models/products.model.js` |
+| 📝 Documentación | `src/models/roles.model.js` |
+| 📝 Documentación | `src/routes/auth.routes.js` |
+| 📝 Documentación | `src/routes/users.routes.js` |
+| 📝 Documentación | `src/routes/categories.routes.js` |
+| 📝 Documentación | `src/routes/products.routes.js` |
+| 📝 Documentación | `src/routes/roles.routes.js` |
+| 📝 Documentación | `src/routes/audits.routes.js` |
+| ⚙️ Configuración | `.env.example` (NODE_ENV + CORS_ORIGIN añadidos) |
+
+---
+
 ## 🛡️ Actualización reciente: RBAC completo + esquema en inglés + validación con Zod
 
 Se implementó un sistema completo de **Control de Acceso Basado en Roles (RBAC)** con permisos granulares, validación de entradas con Zod y renombrado total del esquema de base de datos al inglés. Esta actualización reemplaza el sistema anterior de `checkRole` por una arquitectura de permisos por código (`resource.action`), haciendo el sistema más flexible, escalable y seguro.
