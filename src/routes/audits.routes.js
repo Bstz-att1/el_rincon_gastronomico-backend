@@ -16,15 +16,9 @@
 // ============================================
 
 import { Router } from "express";
-import {
-    getAllAuditLogs,
-    getAuditLogById,
-    createAuditLog,
-} from "../controllers/audits.controller.js";
-import { authMiddleware }  from "../middlewares/auth.middleware.js";
-import { checkPermission } from "../middlewares/rbac.middleware.js";
-import { validate }        from "../middlewares/validator.middleware.js";
-import { createAuditLogSchema } from "../schemas/audits.schema.js";
+import { getAllAuditLogs, getAuditLogById, createAuditLog } from "../controllers/index.js";
+import { authMiddleware, checkPermission, validate }        from "../middlewares/index.js";
+import { createAuditLogSchema }                             from "../schemas/index.js";
 
 const auditRouter = Router();
 

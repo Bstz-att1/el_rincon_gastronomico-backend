@@ -26,15 +26,13 @@ import {
     updateRoleComplete,
     updateRolePartial,
     deleteRole,
-} from "../controllers/roles.controller.js";
-import { authMiddleware }  from "../middlewares/auth.middleware.js";
-import { checkPermission } from "../middlewares/rbac.middleware.js";
-import { validate }        from "../middlewares/validator.middleware.js";
+} from "../controllers/index.js";
+import { authMiddleware, checkPermission, validate } from "../middlewares/index.js";
 import {
     createRoleSchema,
     updateRoleSchema,
     patchRoleSchema,
-} from "../schemas/roles.schema.js";
+} from "../schemas/index.js";
 
 const roleRouter = Router();
 

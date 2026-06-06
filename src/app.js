@@ -18,18 +18,21 @@ import "dotenv/config";
 import express from "express";
 import cors    from "cors";
 
-import "./config/db.js";
-import { validateJWTConfig } from "./config/jwt.config.js";
+// config/index.js re-exporta pool desde db.js, por lo que el side-effect
+// de conexión a MySQL se ejecuta automáticamente al importar desde el barril.
+import { validateJWTConfig } from "./config/index.js";
 
-import authRouter     from "./routes/auth.routes.js";
-import userRouter     from "./routes/users.routes.js";
-import categoryRouter from "./routes/categories.routes.js";
-import productRouter  from "./routes/products.routes.js";
-import auditRouter    from "./routes/audits.routes.js";
-import roleRouter     from "./routes/roles.routes.js";
+import {
+    authRouter,
+    userRouter,
+    categoryRouter,
+    productRouter,
+    auditRouter,
+    roleRouter,
+} from "./routes/index.js";
 
-import { successResponse }                     from "./utils/response.handler.js";
-import { globalErrorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
+import { successResponse }                     from "./utils/index.js";
+import { globalErrorHandler, notFoundHandler } from "./middlewares/index.js";
 
 // ============================================
 //   1. VALIDACIÓN DE CONFIGURACIÓN JWT

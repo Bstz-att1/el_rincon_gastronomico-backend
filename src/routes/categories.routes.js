@@ -19,15 +19,13 @@ import {
     updateCategoryComplete,
     updateCategoryPartial,
     deleteCategory,
-} from "../controllers/categories.controller.js";
-import { authMiddleware }  from "../middlewares/auth.middleware.js";
-import { checkPermission } from "../middlewares/rbac.middleware.js";
-import { validate }        from "../middlewares/validator.middleware.js";
+} from "../controllers/index.js";
+import { authMiddleware, checkPermission, validate } from "../middlewares/index.js";
 import {
     createCategorySchema,
     updateCategorySchema,
     patchCategorySchema,
-} from "../schemas/categories.schema.js";
+} from "../schemas/index.js";
 
 const categoryRouter = Router();
 

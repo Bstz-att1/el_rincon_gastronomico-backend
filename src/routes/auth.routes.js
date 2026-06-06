@@ -12,10 +12,9 @@
 // ============================================
 
 import { Router } from "express";
-import { login, logout, getMe } from "../controllers/auth.controller.js";
-import { authMiddleware } from "../middlewares/auth.middleware.js";
-import { validate }       from "../middlewares/validator.middleware.js";
-import { loginSchema }    from "../schemas/auth.schema.js";
+import { login, logout, getMe }    from "../controllers/index.js";
+import { authMiddleware, validate } from "../middlewares/index.js";
+import { loginSchema }             from "../schemas/index.js";
 
 const authRouter = Router();
 
