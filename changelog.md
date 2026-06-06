@@ -690,3 +690,222 @@ Se actualizaron imports de rutas:
   - ahora importa `../models/audits.model.js`
 - `src/controllers/auth.controller.js`
   - ahora importa `../models/users.model.js`
+
+---
+
+## 🔒 Actualización reciente: Refuerzo robusto del sistema de autenticación JWT
+
+Se reestructuró y reforzó completamente el sistema de validación JWT para lograr un estándar de seguridad profesional. El objetivo fue eliminar puntos débiles del sistema anterior e implementar múltiples capas de protección sin depender de infraestructura externa (Redis, blacklists, etc.).
+
+### Motivación
+
+El sistema anterior presentaba las siguientes debilidades:
+- El `JWT_SECRET` tenía un fallback inseguro en el código (`"dev_jwt_secret_change_me"`).
+- El middleware verificaba solo la firma del token, sin validar claims adicionales (issuer, audience, algoritmo).
+- No existía diferenciación entre tipos de error JWT (expirado, manipulado, malformado).
+- No había mecanismo para invalidar tokens activos al cerrar sesión (logout).
+- La lógica de generación del token estaba acoplada al controlador.
+- No había endpoint de logout ni de verificación de sesión activa (`/me`).
+
+---
+
+### Archivos creados
+
+#### 1) `src/config/jwt.config.js`
+Módulo de configuración JWT centralizado. Define y valida toda la configuración al arranque de la aplicación.
+
+Funcionalidades:
+- `validateJWTConfig()`
+  - Verifica que `JWT_SECRET` exista y tenga mínimo **32 caracteres**.
+  - Verifica que `JWT_EXPIRES_IN` esté definida.
+  - Lanza un error fatal si la configuración es insegura — **la app no arranca** si el `.env` no cumple los requisitos.
+- `JWT_CONFIG` (objeto `Object.freeze`)
+  - `secret`: clave secreta desde variable de entorno.
+  - `expiresIn`: tiempo de vida del token.
+  - `algorithm`: `"HS256"` (fijo — no alterable en runtime).
+  - `issuer`: identificador del emisor de la API.
+  - `audience`: identificador del receptor esperado.
+
+#### 2) `src/services/token.service.js`
+Servicio dedicado al ciclo de vida de los tokens JWT. Centraliza generación, verificación y extracción.
+
+Funciones implementadas:
+- `signToken(user)`
+  - Genera JWT con los claims estándar:
+    - `sub` (subject): ID del usuario como string.
+    - `id`: ID del usuario.
+    - `username`, `nombre`, `rol`: datos de identidad.
+    - `tokenVersion`: versión del token para invalidación sin blacklist.
+    - `iss`, `aud`, `iat`, `exp`: claims de seguridad estándar RFC 7519.
+  - Aplica algoritmo, issuer y audience desde `JWT_CONFIG`.
+- `verifyToken(token)`
+  - Verifica firma, algoritmo (lista blanca: solo `HS256`), issuer, audience y expiración.
+  - Diferencia tres tipos de error:
+    - `TokenExpiredError` → `401 "Sesión expirada"` con mensaje orientado al usuario.
+    - `NotBeforeError` → `401 "Token no activo aún"`.
+    - `JsonWebTokenError` → `401 "Token inválido"` sin revelar detalles de implementación.
+  - Cualquier error inesperado produce `500` sin exponer información sensible.
+- `extractTokenFromHeader(authHeader)`
+  - Valida existencia y tipo del header.
+  - Verifica prefijo `Bearer ` (con espacio).
+  - Valida estructura de JWT: exactamente **3 partes** separadas por puntos, ninguna vacía.
+  - Retorna `null` si cualquier condición falla — no lanza excepciones.
+
+#### 3) `sql/migrations/001_add_token_version.sql`
+Script de migración para bases de datos existentes.
+- Agrega la columna `token_version INT UNSIGNED NOT NULL DEFAULT 0` a la tabla `usuarios` usando `ADD COLUMN IF NOT EXISTS`.
+- Reinicia a `0` todos los registros existentes (estado limpio post-migración).
+- Incluye `SELECT` de verificación al final.
+
+---
+
+### Archivos modificados
+
+#### 4) `src/middlewares/auth.middleware.js`
+Reescritura completa con validación en **5 capas secuenciales**:
+
+| Capa | Qué valida |
+|------|------------|
+| **1** | Extracción y formato del header (`Bearer` + 3 partes JWT) |
+| **2** | Verificación criptográfica: firma, algoritmo, issuer, audience, expiración |
+| **3** | Payload mínimo: presencia de `id`, `username`, `rol` |
+| **4** | Existencia del usuario en base de datos (detecta cuentas eliminadas post-login) |
+| **5** | Versión del token (`tokenVersion` del JWT vs `token_version` en DB) |
+
+Cambios adicionales:
+- `req.user` ahora se construye **desde la base de datos** (no desde el token), garantizando datos siempre actualizados.
+- Errores operacionales se pasan a `next()` para que el manejador global los procese.
+- `checkRole(...allowedRoles)` mejorado con mensaje descriptivo que indica qué roles se requieren.
+
+#### 5) `src/controllers/auth.controller.js`
+Se refactorizó el controlador existente y se agregaron dos endpoints nuevos.
+
+Cambios en `login`:
+- Usa `signToken(user)` del servicio de tokens (separación de responsabilidades).
+- Validación de tipo en `username` y `password` (evita inyección de objetos).
+- Sanitización básica: `username.trim()`.
+- Mensaje de error genérico intencional: no indica si el usuario existe o no (**evita User Enumeration Attack**).
+- La respuesta incluye `expiresIn` para que el cliente sepa cuándo vence el token.
+
+Nuevo endpoint `logout`:
+- `POST /auth/logout` (ruta protegida — requiere `authMiddleware`).
+- Llama a `UserModel.incrementTokenVersion(userId)`.
+- Invalida **todos los tokens previos** del usuario sin blacklist externa.
+
+Nuevo endpoint `getMe`:
+- `GET /auth/me` (ruta protegida — requiere `authMiddleware`).
+- Devuelve los datos del usuario autenticado desde `req.user` (datos frescos de DB).
+- Útil para que el frontend verifique el estado de la sesión activa.
+
+#### 6) `src/routes/auth.routes.js`
+Se registraron las dos rutas nuevas:
+
+- `POST /auth/login` — pública, no requiere token.
+- `POST /auth/logout` — protegida con `authMiddleware`.
+- `GET /auth/me` — protegida con `authMiddleware`.
+
+#### 7) `src/models/users.model.js`
+Se introdujo la constante `PUBLIC_FIELDS` para centralizar las columnas seleccionadas en todos los `SELECT` públicos. Ahora incluye `token_version`.
+
+Cambios en métodos existentes:
+- `findAll()`, `findById()`, `findByDocumento()`, `create()`, `updateComplete()`, `updatePartial()`: actualizados para seleccionar `token_version` junto con el resto de campos públicos.
+- `findByUsername()`: mantiene `SELECT *` — se usa exclusivamente en login para obtener `password_hash`.
+- `updatePartial()`: se corrigió el uso de `?? null` en lugar de variables sin definir para campos opcionales.
+
+Nuevo método:
+- `incrementTokenVersion(id)`
+  - Ejecuta: `UPDATE usuarios SET token_version = token_version + 1 WHERE id = ?`
+  - Retorna `boolean` (`affectedRows > 0`).
+  - Se usa en `POST /auth/logout` para invalidar todas las sesiones previas del usuario.
+
+Método agregado:
+- `findByUsernamePublic(username)`
+  - Búsqueda por username **sin** `password_hash` para validaciones de duplicados en creación de usuario.
+
+#### 8) `sql/database.sql`
+Se actualizó la definición de la tabla `usuarios`:
+
+```sql
+token_version INT UNSIGNED NOT NULL DEFAULT 0,
+```
+
+Se incluyó comentario explicativo del mecanismo de invalidación en la definición de la columna.
+
+#### 9) `src/app.js`
+Cambios aplicados:
+- Se agregó `import "dotenv/config"` al inicio para garantizar carga de variables de entorno antes de cualquier otro módulo.
+- Se importa y ejecuta `validateJWTConfig()` antes de la inicialización de Express.
+  - Si la configuración JWT es insegura o incompleta, la aplicación **no arranca** y muestra los errores específicos de configuración.
+
+#### 10) `.env.example`
+Se agregaron las variables de entorno requeridas para JWT con documentación inline:
+
+```env
+JWT_SECRET=CAMBIA_ESTO_POR_UN_SECRETO_SEGURO_DE_AL_MENOS_32_CARACTERES
+JWT_EXPIRES_IN=8h
+JWT_ISSUER=rincon-gastronomico-api
+JWT_AUDIENCE=rincon-gastronomico-app
+```
+
+Se incluyó instrucción para generar un secreto seguro con Node.js:
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+
+---
+
+### Mecanismo de invalidación de sesiones (logout sin blacklist)
+
+```
+Login  → JWT emitido con claim:  tokenVersion = user.token_version  (ej: 0)
+Logout → DB ejecuta:             token_version = token_version + 1  (ahora: 1)
+Request siguiente →              decoded.tokenVersion (0) ≠ DB (1)
+                   →             401 "Sesión cerrada"
+```
+
+Este mecanismo garantiza que cualquier token emitido antes del logout queda inválido automáticamente, sin necesidad de almacenar tokens en memoria o en una blacklist.
+
+---
+
+### Endpoints impactados
+
+#### Nuevos
+- `POST /auth/logout` — cierra la sesión invalidando tokens anteriores.
+- `GET /auth/me` — devuelve datos del usuario autenticado actualmente.
+
+#### Modificados
+- `POST /auth/login` — respuesta ampliada con `expiresIn`; token generado con claims de seguridad completos.
+
+#### Sin cambios funcionales (solo seguridad reforzada)
+- Todos los endpoints protegidos (`/usuarios`, `/categorias`, `/productos`, `/auditoria`) ahora pasan por la validación de 5 capas.
+
+---
+
+### Instrucción de migración para base de datos existente
+
+Si la base de datos ya está creada, ejecutar:
+
+```sql
+-- sql/migrations/001_add_token_version.sql
+ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS token_version INT UNSIGNED NOT NULL DEFAULT 0 AFTER rol;
+```
+
+Para bases de datos nuevas, el script `sql/database.sql` ya incluye la columna.
+
+---
+
+### Resumen de archivos por tipo de cambio
+
+| Tipo | Archivo |
+|------|---------|
+| ✅ Creado | `src/config/jwt.config.js` |
+| ✅ Creado | `src/services/token.service.js` |
+| ✅ Creado | `sql/migrations/001_add_token_version.sql` |
+| 🔄 Modificado | `src/middlewares/auth.middleware.js` |
+| 🔄 Modificado | `src/controllers/auth.controller.js` |
+| 🔄 Modificado | `src/routes/auth.routes.js` |
+| 🔄 Modificado | `src/models/users.model.js` |
+| 🔄 Modificado | `sql/database.sql` |
+| 🔄 Modificado | `src/app.js` |
+| 🔄 Modificado | `.env.example` |
