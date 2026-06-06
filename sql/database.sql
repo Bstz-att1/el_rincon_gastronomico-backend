@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     rol ENUM('admin', 'user') DEFAULT 'user',
+    -- token_version: mecanismo de invalidación de sesiones sin blacklist externa.
+    -- Se incrementa en cada logout. El authMiddleware compara este valor con
+    -- el claim tokenVersion del JWT — si no coinciden, el token es rechazado.
+    token_version INT UNSIGNED NOT NULL DEFAULT 0,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
