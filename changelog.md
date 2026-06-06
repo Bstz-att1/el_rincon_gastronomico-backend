@@ -550,3 +550,81 @@ Se agregaron librerías de seguridad:
 - `user`:
   - acceso de consulta (GET) en módulos protegidos.
   - sin permisos administrativos de creación/edición/eliminación en rutas restringidas.
+
+---
+
+## 🧩 Actualización reciente: Estandarización profesional de respuestas y manejo global de errores
+
+Se reorganizó el manejo de respuestas y errores para hacer el backend más mantenible, consistente y profesional, reduciendo duplicación de lógica en controladores.
+
+### Objetivo del cambio
+- Centralizar el tratamiento de errores.
+- Estandarizar completamente el contrato de respuestas.
+- Eliminar `try/catch` repetitivos en controladores asíncronos.
+- Mantener compatibilidad con la arquitectura y estilo del proyecto.
+
+### Archivos creados
+
+#### 1) `src/utils/catchAsync.js`
+Se agregó utilidad para envolver controladores asíncronos y delegar errores al middleware global:
+
+- `catchAsync(fn)`
+  - Retorna función `(req, res, next)`.
+  - Ejecuta `Promise.resolve(fn(...)).catch(next)` para capturar errores sin repetir `try/catch`.
+
+#### 2) `src/middlewares/error.middleware.js`
+Se creó middleware centralizado de errores:
+
+- `notFoundHandler`
+  - Responde 404 para rutas no registradas.
+  - Mensaje incluye método y URL solicitada.
+- `globalErrorHandler`
+  - Toma `statusCode`, `message` y `errors` desde errores controlados.
+  - Usa `errorResponse` para mantener formato unificado.
+
+### Archivos modificados
+
+#### 3) `src/utils/response.handler.js`
+Se reforzó la utilidad de respuestas:
+
+- `successResponse(res, statusCode, message, data = [])`
+  - Incluye ahora `errors: []` para mantener estructura uniforme.
+- `errorResponse(res, statusCode, message, errors = [])`
+  - Asegura que `errors` siempre sea arreglo.
+- `buildError(message, statusCode, details = [])`
+  - Crea errores operacionales controlados con:
+    - `statusCode`
+    - `isOperational`
+    - `errors`
+- `buildUnauthorizedError(detail?)`
+  - Atajo para errores HTTP 401 estandarizados.
+
+#### 4) `src/app.js`
+Se integró pipeline global de error al final de rutas:
+
+- Registro de middleware 404:
+  - `app.use(notFoundHandler);`
+- Registro de middleware global:
+  - `app.use(globalErrorHandler);`
+
+#### 5) Controladores refactorizados a patrón `catchAsync + buildError`
+Se migró de `try/catch + errorResponse` a `catchAsync` en:
+
+- `src/controllers/auth.controller.js`
+- `src/controllers/usuario.controller.js`
+- `src/controllers/categoria.controller.js`
+- `src/controllers/producto.controller.js`
+- `src/controllers/auditoria.controller.js`
+
+Cambios aplicados:
+- Validaciones de negocio ahora usan `next(buildError(...))`.
+- Errores inesperados se propagan automáticamente al middleware global.
+- Respuestas exitosas mantienen `successResponse`.
+
+### Beneficios obtenidos
+- Menor código repetido y controladores más limpios.
+- Contrato de error unificado en toda la API.
+- Mejor separación de responsabilidades:
+  - controlador: lógica de negocio
+  - middleware: composición final de errores HTTP
+- Mayor facilidad para escalar reglas de error futuras (logging, trazabilidad, códigos internos, etc.).
