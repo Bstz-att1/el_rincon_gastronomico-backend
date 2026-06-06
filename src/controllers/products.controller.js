@@ -2,7 +2,7 @@
 //      CONTROLADOR CENTRADO EN PRODUCTOS
 //  ============================================ 
 
-import { ProductModel } from "../models/producto.model.js";
+import { ProductModel } from "../models/products.model.js";
 import { buildError, successResponse } from "../utils/response.handler.js";
 import { catchAsync } from "../utils/catchAsync.js";
 

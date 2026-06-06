@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { UserModel } from "../models/usuario.model.js";
+import { UserModel } from "../models/users.model.js";
 import { buildError, successResponse } from "../utils/response.handler.js";
 import { catchAsync } from "../utils/catchAsync.js";
 

@@ -2,7 +2,7 @@
 //      CONTROLADOR CENTRADO EN AUDITORÍA
 //  ============================================ 
 
-import { AuditModel } from "../models/auditoria.model.js";
+import { AuditModel } from "../models/audits.model.js";
 import { buildError, successResponse } from "../utils/response.handler.js";
 import { catchAsync } from "../utils/catchAsync.js";
 

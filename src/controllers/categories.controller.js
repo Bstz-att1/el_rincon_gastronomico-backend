@@ -2,7 +2,7 @@
 //      CONTROLADOR CENTRADO EN CATEGORÍAS
 //  ============================================ 
 
-import { CategoryModel } from "../models/categoria.model.js";
+import { CategoryModel } from "../models/categories.model.js";
 import { buildError, successResponse } from "../utils/response.handler.js";
 import { catchAsync } from "../utils/catchAsync.js";
 
