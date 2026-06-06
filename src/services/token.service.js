@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
-import { JWT_CONFIG } from "../config/jwt.config.js";
-import { buildError } from "../utils/response.handler.js";
+import { JWT_CONFIG } from "../config/index.js";
+import { buildError }  from "../utils/index.js";
 
 // ============================================
 //          SERVICIO DE TOKENS JWT
